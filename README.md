@@ -8,12 +8,8 @@
   - [Citing](#citing)
   - [Contributing](#contributing)
 
-`SelfConcordantSmoothOptimization.jl` is a JUlia package that implements the self-concordant regularization (SCORE) technique for (nonsmooth) convex optimization. In particular, `SelfConcordantSmoothOptimization.jl` considers problems of the form
-$$
-\begin{array}{ll}
-\mathrm{minimize} & \mathrm{f(x) + g(x)}\\
-\end{array}
-$$
+`SelfConcordantSmoothOptimization.jl` is a Julia package that implements the self-concordant regularization (SCORE) technique for (nonsmooth) convex optimization. In particular, `SelfConcordantSmoothOptimization.jl` considers problems of the form
+$$\begin{array}{ll} \mathrm{minimize} & \mathrm{f(x) + g(x)}\\ \end{array}$$
 where $\mathrm{f}\colon \mathbb{R}^n \to \mathbb{R}$ is smooth and convex, and $\mathrm{g}\colon \mathbb{R}^n \to \mathbb{R}$, which may be nonsmooth, is proper, closed and convex. The smooth part $\mathrm{f}$ defines the problem's objective function, such as quantifying a data-misfit, while the nonsmooth part $\mathrm{g}$ imposes certain properties, such as sparsity, on the decision variable $\mathrm{x}$. Please see [Implementation details and recommendations](#implementation-details-and-recommendations) for functions that are currently supported for each implemented algorithm.
 
 ## Installation
@@ -136,7 +132,7 @@ As the package name and description imply, the implemented algorithms use a gene
 | `"l2"`           	| <li>`PHuberSmootherL1L2`($\mu$)</li> <li>`ExponentialSmootherL2`($\mu$)</li> <li>`BurgSmootherL2`($\mu$)</li>                                                                       	| $\mu>0$                                                                                             	|
 | `"indbox"`       	| <li>`PHuberSmootherIndBox`(`lb`, `ub` ,$\mu$)</li> <li>`ExponentialSmootherIndBox`(`lb`, `ub`, $\mu$)</li>                                                                          	| $\mu>0$ <br> `lb`: lower bound in the box constraints <br> `ub`: upper bound in the box constraints 	|
 
-- While the others may work, we highly recommend to use `PHuberSmootherL1L2` with `"l1"` and `"l2"`, as it provides smooth approximations that satisfy the self-concordant smoothing conditions for the (scaled) $\ell_1$- and $\ell_2$-norms.
+- We highly recommend to use `PHuberSmootherL1L2` with `"l1"` and `"l2"`, as it provides smooth approximations that satisfy the self-concordant smoothing conditions for the (scaled) $\ell_1$- and $\ell_2$-norms.
 - For large scale problems with $m\gg n$, users may consider using `ProxBFGSSCORE`, which takes the similar arguments as `ProxNSCORE`, but does not require the Hessian of $\mathrm{f}$.
 
 For more details and insights on the approach implemented in this package, please see the associated paper in [Citing](#citing) below.

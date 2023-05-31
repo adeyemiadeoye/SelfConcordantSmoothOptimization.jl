@@ -132,12 +132,12 @@ As the package name and description imply, the implemented algorithms use a gene
 
 | `reg_name` value 	| Implemented $\mathrm{g_s}$ function(s)                                                                                                                                              	| Remark(s)                                                                                           		|
 |------------------	|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------	|-----------------------------------------------------------------------------------------------------	|
-| `"l1"`           	| <li>`PHuberSmootherL1L2`($\mu$)</li> <li>`ExponentialSmootherL1`($\mu$)</li> <li>`LogisticSmootherL1`($\mu$)</li> <li>`BoShSmootherL1`($\mu$)</li> <li>`BurgSmootherL1`($\mu$)</li> 	| $\mu>0$                                                                                             	|
-| `"l2"`           	| <li>`PHuberSmootherL1L2($\mu$)`</li> <li>`ExponentialSmootherL2($\mu$)`</li> <li>`BurgSmootherL2($\mu$)`</li>                                                                       	| $\mu>0$                                                                                             	|
-| `"indbox"`       	| <li>`PHuberSmootherIndBox(lb, ub, $\mu$)`</li> <li>`ExponentialSmootherIndBox(lb, ub, $\mu$)`</li>                                                                          	| $\mu>0$ <br> `lb`: lower bound in the box constraints <br> `ub`: upper bound in the box constraints 	|
+| `"l1"`           	| <li>`PHuberSmootherL1L2(&mu)`</li> <li>`ExponentialSmootherL1(&mu)`</li> <li>`LogisticSmootherL1(&mu)`</li> <li>`BoShSmootherL1(&mu)`</li> <li>`BurgSmootherL1(&mu)`</li> 	| $\mu>0$                                                                                             	|
+| `"l2"`           	| <li>`PHuberSmootherL1L2(&mu)`</li> <li>`ExponentialSmootherL2(&mu)`</li> <li>`BurgSmootherL2(&mu)`</li>                                                                       	| $\mu>0$                                                                                             	|
+| `"indbox"`       	| <li>`PHuberSmootherIndBox(lb, ub, &mu)`</li> <li>`ExponentialSmootherIndBox(lb, ub, &mu)`</li>                                                                          	| $\mu>0$ <br> `lb`: lower bound in the box constraints <br> `ub`: upper bound in the box constraints 	|
 
 - We highly recommend to use `PHuberSmootherL1L2` with `"l1"` and `"l2"`, as it provides smooth approximations that satisfy the self-concordant smoothing conditions for the (scaled) $\ell_1$- and $\ell_2$-norms.
-- For large scale problems with $m\gg n$, users may consider using `ProxBFGSSCORE`, which takes the similar arguments as `ProxNSCORE`, but does not require the Hessian of $\mathrm{f}$.
+- For large scale problems with $m\gg n$, users may consider using `ProxBFGSSCORE`, which takes similar arguments as `ProxNSCORE`, but does not require the Hessian of $\mathrm{f}$.
 
 For more details and insights on the approach implemented in this package, please see the associated paper in [Citing](#citing) below.
 

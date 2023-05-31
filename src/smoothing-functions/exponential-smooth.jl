@@ -7,7 +7,7 @@ mutable struct ExponentialSmootherL1 <: Smoother
     Mh
     ν
     val
-	grad
+    grad
     hess
 end
 
@@ -16,7 +16,7 @@ mutable struct ExponentialSmootherL2 <: Smoother
     Mh
     ν
     val
-	grad
+    grad
     hess
 end
 
@@ -25,7 +25,7 @@ mutable struct ExponentialSmootherIndBox <: Smoother
     Mh
     ν
     val
-	grad
+    grad
     hess
 end
 

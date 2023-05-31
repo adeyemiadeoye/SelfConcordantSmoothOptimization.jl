@@ -5,7 +5,7 @@ mutable struct BurgSmootherL1 <: Smoother
     Mh
     ν
     val
-	grad
+    grad
     hess
 end
 
@@ -14,7 +14,7 @@ mutable struct BurgSmootherL2 <: Smoother
     Mh
     ν
     val
-	grad
+    grad
     hess
 end
 

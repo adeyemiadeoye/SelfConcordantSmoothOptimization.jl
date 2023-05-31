@@ -14,7 +14,7 @@ mutable struct PHuberSmootherIndBox <: Smoother
     Mh
     ν
     val
-	grad
+    grad
     hess
 end
 

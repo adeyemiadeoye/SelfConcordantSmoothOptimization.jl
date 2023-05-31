@@ -5,7 +5,7 @@ mutable struct LogisticSmootherL1 <: Smoother
     Mh
     ν
     val
-	grad
+    grad
     hess
 end
 

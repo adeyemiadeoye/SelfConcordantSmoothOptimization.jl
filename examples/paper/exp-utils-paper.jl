@@ -15,7 +15,6 @@ end
 # Random.seed!(1234)
 
 include("splogl1.jl")
-include("boxQP.jl")
 include("spdeconv.jl")
 include("benchmark-algos.jl")
 

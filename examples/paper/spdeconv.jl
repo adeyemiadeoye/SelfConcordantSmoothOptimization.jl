@@ -6,7 +6,7 @@ function rr()
 end
 
 
-# SPARSE DECONVOLUTION PROBLEMS with L1 and L2 reg
+# SPARSE DECONVOLUTION PROBLEMS with L1 reg
 function SpDeconv(model_name::String, N::Integer, λ::Float64)
     A, B, H, y, noise, x = init_SpDeconv_models(N)
     grad_fx, hess_fx, jac_yx, grad_fy, hess_fy = get_derivative_fns(A, B, y)

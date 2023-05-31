@@ -5,6 +5,11 @@ export OWLQN
 # Orthant-Wise Limited-memory Quasi-Newton method (OWL-QN), basically an L-BFGS method
 # Source and credits: the implementation here is entirely based on the GitHub Gist https://gist.github.com/yegortk/ce18975200e7dffd1759125972cd54f4
 # adapted here for the ProximalMethod type (strictly for comparison and not part of the present project)
+#
+## References:
+# Andrew, G., & Gao, J. (2007, June). Scalable training of l 1-regularized log-linear models. In Proceedings of the 24th international conference on Machine learning (pp. 33-40).
+# Gong, P., & Ye, J. (2015, June). A modified orthant-wise limited memory quasi-Newton method with convergence analysis. In International Conference on Machine Learning (pp. 276-284). PMLR.
+
 Base.@kwdef mutable struct OWLQN <: ProximalMethod
     s::Vector{Any} = []                 # param_t+1 - param_t [max size of  memory m]
     y::Vector{Any} = []                 # grad_t+1 - grad_t [max size of memory m]

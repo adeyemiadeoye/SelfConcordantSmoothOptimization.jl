@@ -130,9 +130,10 @@ end
 
 include("algorithms/prox-N-SCORE.jl")
 include("algorithms/prox-GGN-SCORE.jl")
-include("algorithms/prox-grad.jl")
 include("algorithms/prox-BFGS-SCORE.jl")
-include("algorithms/OWL-QN.jl")
+# extras
+include("algorithms/extras/prox-grad.jl")
+include("algorithms/extras/OWLQN.jl")
 
 include("smoothing-functions/smoothing.jl")
 include("smoothing-functions/phuber-smooth.jl")

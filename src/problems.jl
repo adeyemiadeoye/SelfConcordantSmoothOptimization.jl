@@ -16,7 +16,7 @@ const IntOrFloat = Union{Int64, Float64}
 const IntervalVectorTupleOrNothing = Union{ClosedInterval{T}, Interval{:closed, :closed, T}, Tuple{T, T}, Vector{T}, Nothing} where {T<:Real}
 
 mutable struct Problem <: ProxModel
-	A                   # input data
+    A                   # input data
     y                   # output data
     x0                  # initial x
     f                   # smooth part of the objective function

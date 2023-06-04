@@ -2,7 +2,7 @@ using SelfConcordantSmoothOptimization
 
 export ProxQNSCORE
 
-# Proximal Quasi-Newton method (BFGS)
+# A Proximal Quasi-Newton method (BFGS)
 Base.@kwdef mutable struct ProxQNSCORE <: ProximalMethod
     ss_type::Int = 1
     H::Matrix{Float64} = Matrix{Float64}(I, 1, 1)
@@ -29,7 +29,7 @@ function step!(method::ProxQNSCORE, reg_name, model, hμ, As, x, x_prev, ys, ite
     d = -(H + λHr)\∇f
 
     if method.ss_type == 1 && model.L !==nothing
-        step_size = 1/model.L
+        step_size = min(1/model.L,1.0)
     elseif method.ss_type == 1 && model.L === nothing
         step_size = 0.5
     elseif method.ss_type == 2 || model.L === nothing

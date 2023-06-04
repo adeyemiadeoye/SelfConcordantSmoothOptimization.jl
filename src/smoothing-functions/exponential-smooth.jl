@@ -36,10 +36,10 @@ ExponentialSmootherL1(mu::IntOrFloat; val=x->exp_smooth_l1.(x;μ=mu), grad=x->ex
 
 ExponentialSmootherL2(mu::IntOrFloat; val=x->exp_smooth_l2.(x;μ=mu), grad=x->exp_smooth_grad_l2.(x;μ=mu), hess=x->exp_smooth_hess_l2.(x;μ=mu)) = ExponentialSmootherL2(mu, exp_smooth_Mh, exp_smooth_ν, val, grad, hess)
 
-function ExponentialSmootherIndBox(lb::IntOrFloat, ub::IntOrFloat, mu::IntOrFloat)
-    val = x -> exp_smooth_indbox.(x;μ=mu,a=lb,b=ub)
-    grad = x -> exp_smooth_grad_indbox.(x;μ=mu,a=lb,b=ub)
-    hess = x -> exp_smooth_hess_indbox.(x;μ=mu,a=lb,b=ub)
+function ExponentialSmootherIndBox(lb::VectorOrFloat, ub::VectorOrFloat, mu::IntOrFloat)
+    val = x -> exp_smooth_indbox(x;μ=mu,lb=lb,ub=ub)
+    grad = x -> exp_smooth_grad_indbox(x;μ=mu,lb=lb,ub=ub)
+    hess = x -> exp_smooth_hess_indbox(x;μ=mu,lb=lb,ub=ub)
     
     return ExponentialSmootherIndBox(mu, exp_smooth_Mh, exp_smooth_ν, val, grad, hess)
 end
@@ -64,12 +64,18 @@ function exp_smooth_hess_l2(x; μ=1.0) # returns a vector, the diagonal part of 
     lambertw(1/μ*exp(-x/μ))/(1+lambertw(1/μ*exp(-x/μ)))
 end
 
-function exp_smooth_indbox(x; μ=1.0, a=0.0, b=1.0)
-    exp((-x + a) / μ) * μ
+function exp_smooth_indbox(x; μ=1.0, lb=0.0, ub=1.0)
+    n = size(x,1)
+    a, b = bounds_sanity_check(n, lb, ub)
+    return @. exp((-x + a) / μ) * μ
 end
-function exp_smooth_grad_indbox(x; μ=1.0, a=0.0, b=1.0)
-    -exp((-x + a) / μ)
+function exp_smooth_grad_indbox(x; μ=1.0, lb=0.0, ub=1.0)
+    n = size(x,1)
+    a, b = bounds_sanity_check(n, lb, ub)
+    return @. -exp((-x + a) / μ)
 end
-function exp_smooth_hess_indbox(x; μ=1.0, a=0.0, b=1.0) # returns a vector, the diagonal part of exp_smooth_hess_l2 (a diagonal matrix)
-    1/μ * exp((-x + a)/μ)
+function exp_smooth_hess_indbox(x; μ=1.0, lb=0.0, ub=1.0) # returns a vector, the diagonal part of exp_smooth_hess_l2 (a diagonal matrix)
+    n = size(x,1)
+    a, b = bounds_sanity_check(n, lb, ub)
+    return @. 1/μ * exp((-x + a)/μ)
 end

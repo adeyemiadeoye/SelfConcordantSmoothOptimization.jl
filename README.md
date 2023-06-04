@@ -42,9 +42,6 @@ x0 = randn(m);
 
 # Define objective function and choose problem parameters
 f(x) = 1/m*sum(log.(1 .+ exp.(-y .* (A*x))));
-# Note that in this example, we can also define f in a different way (thanks to Julia's multiple dispatch feature)
-# this will ONLY be necessary for ProxGGNSCORE
-f(y, yhat) = -1/m*sum(y .* log.(yhat) .+ (1 .- y) .* log.(1 .- yhat))
 
 # choose problem parameters
 reg_name = "l1";
@@ -64,7 +61,10 @@ solution.x
 To use the `ProxGGNSCORE` algorithm, a model output function $\mathcal{M}(A,x)$ is required
 (Note that it is essential to define the function f in two ways as above to use `ProxGGNSCORE`; Julia will decide which one to use at any instance):
 ```julia
-# model output function
+# it is essential to also define the function f using the following alternative form;
+# Julia will decide which one to use at any instance (thanks to the multiple dispatch feature)
+f(y, yhat) = -1/m*sum(y .* log.(yhat) .+ (1 .- y) .* log.(1 .- yhat))
+# where yhat = Mfunc(A, x) is defined by the model output function
 Mfunc(A, x) = 1 ./ (1 .+ exp.(-A*x))
 # set problem
 model = Problem(A, y, x0, f, λ; out_fn=Mfunc);
@@ -134,15 +134,14 @@ As the package name and description imply, the implemented algorithms use a gene
 |------------------	|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------	|-----------------------------------------------------------------------------------------------------	|
 | `"l1"`           	| <li>`PHuberSmootherL1L2(μ)`</li> <li>`ExponentialSmootherL1(μ)`</li> <li>`LogisticSmootherL1(μ)`</li> <li>`BoShSmootherL1(μ)`</li> <li>`BurgSmootherL1(μ)`</li> 	| $\mathrm{\mu}>0$                                                                                             	|
 | `"l2"`           	| <li>`PHuberSmootherL1L2(μ)`</li> <li>`ExponentialSmootherL2(μ)`</li> <li>`BurgSmootherL2(μ)`</li>                                                                       	| $\mathrm{\mu}>0$                                                                                             	|
-| `"indbox"`       	| <li>`PHuberSmootherIndBox(lb,ub,μ)`</li> <li>`ExponentialSmootherIndBox(lb,ub,μ)`</li>                                                                          	| $\mathrm{\mu}>0$ <br> `lb`: lower bound in the box constraints <br> `ub`: upper bound in the box constraints 	|
+| `"indbox"`       	| <li>`PHuberSmootherIndBox(lb,ub,μ)`</li> <li>`ExponentialSmootherIndBox(lb,ub,μ)`</li>                                                                          	| `lb`: lower bound in the box constraints <br> `ub`: upper bound in the box constraints <br> $\mathrm{\mu}>0$ 	|
 
 - We highly recommend to use `PHuberSmootherL1L2` with `"l1"` and `"l2"`, as it provides smooth approximations that satisfy the self-concordant smoothing conditions for the (scaled) $\ell_1$- and $\ell_2$-norms.
-- For large scale problems with $m\gg n$, users may consider using `ProxBFGSSCORE`, which takes similar arguments as `ProxNSCORE`, but does not require the Hessian of $\mathrm{f}$.
 
 For more details and insights on the approach implemented in this package, please see the associated paper in [Citing](#citing) below.
 
 ## Citing
-If you use `SelfConcordantSmoothOptimization.jl` in your work, we kindly request that you cite the following paper:
+If you use `SelfConcordantSmoothOptimization.jl` in your work, particularly the algorithms listed above, we kindly request that you cite the following paper:
 
 ## Contributing
 Please use the [Github issue tracker](https://github.com/adeyemiadeoye/SelfConcordantSmoothOptimization.jl/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) for reporting any issues. All types of issues are welcome including bug reports, feature requests, implementation for a specific research problem, etc.

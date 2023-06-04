@@ -9,25 +9,25 @@ end
 # SPARSE DECONVOLUTION PROBLEMS with L1 reg
 function SpDeconv(model_name::String, N::Integer, λ::Float64)
     A, B, H, y, noise, x = init_SpDeconv_models(N)
-    grad_fx, hess_fx, jac_yx, grad_fy, hess_fy = get_derivative_fns(A, B, y)
+    grad_fx, hess_fx, jac_yx, grad_fy, hess_fy = get_derivative_fns_deconv(A, B, y)
     AB = A\B
     Lf = eigmax(1/N * (AB'*AB))
-    f = x -> f_eval(H, x, y)
-    return Problem(H, y, y, f, λ; Lf=Lf, sol=x, out_fn=out_fn, grad_fx=grad_fx, hess_fx=hess_fx, jac_yx=jac_yx, grad_fy=grad_fy, hess_fy=hess_fy, name=model_name)
+    f = x -> f_deconv(H, x, y)
+    return Problem(H, y, y, f, λ; Lf=Lf, sol=x, out_fn=out_deconv, grad_fx=grad_fx, hess_fx=hess_fx, jac_yx=jac_yx, grad_fy=grad_fy, hess_fy=hess_fy, name=model_name)
 end
 
-function f_eval(Hs, x::T, ys::B) where{T,B}
+function f_deconv(Hs, x::T, ys::B) where{T,B}
     n = size(ys, 1)
-    return 0.5/n*sum(abs2.(out_fn(Hs, x) - ys))
+    return 0.5/n*sum(abs2.(out_deconv(Hs, x) - ys))
 end
 
 # since I am providing the derivative functions, this is not relevant
-# function f_eval_y(ŷ::Array{S}, x::T, ys::B) where{S<:Real,T,B}
+# function f_deconv_y(ŷ::Array{S}, x::T, ys::B) where{S<:Real,T,B}
 #     n = size(ys, 1)
 #     return 0.5/n*sum(abs2.(ŷ - ys))
 # end
 
-function out_fn(Hs::Function, x::T) where{T}
+function out_deconv(Hs::Function, x::T) where{T}
     return Hs(x)
 end
 
@@ -84,7 +84,7 @@ function sample_batch(data, m)
 end
 
 # get derivate functions for the for the linear regression problem
-function get_derivative_fns(Ah::AbstractArray{Float64,2}, Bh::AbstractArray{Float64,2}, y::VectorOrBitVector{<:IntOrFloat})
+function get_derivative_fns_deconv(Ah::AbstractArray{Float64,2}, Bh::AbstractArray{Float64,2}, y::VectorOrBitVector{<:IntOrFloat})
     A = Ah \ Bh
     n = size(A, 1)
     grad_fx(x::Vector{Float64}) = 2/n * A' * (A * x - y)

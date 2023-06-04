@@ -37,7 +37,11 @@ end
 
 function prox_step(proxh::scaled_proximal_indbox)
     (; model, x, h_scale, λ, α) = proxh
-    lb, ub = minimum(model.C_set), maximum(model.C_set)
+    if is_interval_set(model.C_set)
+        lb, ub = minimum(model.C_set), maximum(model.C_set)
+    else
+        lb, ub = model.C_set[1], model.C_set[2]
+    end
     return min.(max.(x, lb), ub)
 end
 

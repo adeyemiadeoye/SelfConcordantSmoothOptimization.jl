@@ -12,7 +12,6 @@ function rr()
     rng = MersenneTwister(1234);
     return rng
 end
-# Random.seed!(1234)
 
 include("splogl1.jl")
 include("spdeconv.jl")
@@ -74,7 +73,7 @@ end
 
 # MAIN FUNCTIONS
 function solve!(model_name::String, method_name::String;
-                N=2000, m=300, λ=2.0, ss_type=1, μ=2.0, max_iter=240, x_tol=1e-10, f_tol=1e-10, reg_name="l1", log_reg_problems=nothing, α=nothing, verbose=0)
+                N=2000, m=300, λ=2.0, ss_type=1, μ=2.0, max_iter=240, x_tol=1e-10, f_tol=1e-10, reg_name="l1", log_reg_problems=nothing, α=nothing, lb=-1.0, ub=1.0, verbose=0)
 
     #   model_name : {"sim_log", "w1a", "mushrooms", "deconv"}
     #   method_name : {"prox-ggnscore", "prox-grad", "prox-newtonscore", "prox-owlqn"}
@@ -113,8 +112,7 @@ function solve!(model_name::String, method_name::String;
     elseif model_name == "boxqp"
         extra_metrics = false
         if reg_name == "indbox"
-            model = BoxQP(model_name, N, λ)
-            lb, ub = minimum(model.C_set), maximum(model.C_set)
+            model = BoxQP(model_name, N, lb, ub, λ)
             g = IndBox(lb, ub) # g function for benchmark algos
         else
             Base.error("Please choose reg_name='indbox'.")

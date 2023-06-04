@@ -12,24 +12,24 @@ end
 function SpLogL1(data_name::String, N::IntegerOrNothing, m::IntegerOrNothing, λ::Float64)
     A, y, x0, x_star = init_Log_model(data_name; N, m) # data_name == "sim_log" or a real dataset name
     Lf = eigmax(1/N * (A'*A))
-    grad_fx, hess_fx, jac_yx, grad_fy, hess_fy = get_derivative_fns(A, y)
-    f = x -> f_eval(A, x, y)
-    return Problem(A, y, x0, f, λ; Lf=Lf, sol=x_star, out_fn=out_fn, grad_fx=grad_fx, hess_fx=hess_fx, jac_yx=jac_yx, grad_fy=grad_fy, hess_fy=hess_fy, name=data_name)
+    grad_fx, hess_fx, jac_yx, grad_fy, hess_fy = get_derivative_fns_splog(A, y)
+    f = x -> f_splog(A, x, y)
+    return Problem(A, y, x0, f, λ; Lf=Lf, sol=x_star, out_fn=out_splog, grad_fx=grad_fx, hess_fx=hess_fx, jac_yx=jac_yx, grad_fy=grad_fy, hess_fy=hess_fy, name=data_name)
 end
 
-function f_eval(Hs::AbstractArray{S,2}, x::T, ys::B) where{S<:Real,T,B}
+function f_splog(Hs::AbstractArray{S,2}, x::T, ys::B) where{S<:Real,T,B}
     n = size(ys, 1)
     return 1/n*sum(log.(1 .+ exp.(-ys .* (Hs*x))))
 end
 
 # since I am providing the derivative functions, this is not relevant
-# function f_eval_y(ŷ::Array{S,1}, x::T, ys::B) where{S<:Real,T,B}
+# function f_splog_y(ŷ::Array{S,1}, x::T, ys::B) where{S<:Real,T,B}
 #     n = size(ys, 1)
 #     return -1/n*sum(ys .* log.(ŷ) .+ (1 .- ys) .* log.(1 .- ŷ))
 #     # return 1/n*sum(log.(1 .+ exp.(-ys .* ŷ)))
 # end
 
-function out_fn(A::AbstractArray{S,2}, x::T) where{S<:Real,T}
+function out_splog(A::AbstractArray{S,2}, x::T) where{S<:Real,T}
     return 1 ./ (1 .+ exp.(-A*x))
 end
 
@@ -151,7 +151,7 @@ function fetch_data(dataset_path, N, m; dense=true)
 end
 
 # get derivate functions for the for the logistic regression problem
-function get_derivative_fns(A::Array{Float64,2}, y::VectorOrBitVector{<:IntOrFloat})
+function get_derivative_fns_splog(A::Array{Float64,2}, y::VectorOrBitVector{<:IntOrFloat})
     n = size(A, 1)
     S(x::Vector{Float64}) = exp.(-y .* (A*x))
     function grad_fx(x::Vector{Float64})

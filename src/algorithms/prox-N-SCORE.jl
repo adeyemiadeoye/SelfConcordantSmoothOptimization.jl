@@ -27,7 +27,7 @@ function step!(method::ProxNSCORE, reg_name, model, hμ, As, x, x_prev, ys, iter
     d = -(H + λHr) \ ∇f
 
     if method.ss_type == 1 && model.L !==nothing
-        step_size = 1/model.L
+        step_size = min(1/model.L,1.0)
     elseif method.ss_type == 1 && model.L === nothing
         step_size = 0.5
     elseif method.ss_type == 2

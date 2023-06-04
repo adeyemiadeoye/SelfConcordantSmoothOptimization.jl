@@ -32,7 +32,7 @@ function burg_smooth_grad_l1(x; μ=1.0)
     x < μ/2 ? -1.0 : -μ/(2*x)
 end
 function burg_smooth_hess_l1(x; μ=1.0) # returns a vector, the diagonal part of burg_smooth_hess_l1 (a diagonal matrix)
-    x < μ/2 ? 1e-9 : μ/(2*x^2)
+    x < μ/2 ? eps() : μ/(2*x^2)
 end
 
 function burg_smooth_l2(x; μ=1.0)

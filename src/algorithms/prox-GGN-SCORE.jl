@@ -40,7 +40,7 @@ function step!(method::ProxGGNSCORE, reg_name, model, hμ, As, x, x_prev, ys, it
     d = ggn_score_step(J, Q, gr, Hr_diag, H_inv, residual, model.λ, size(ys,2))
 
     if method.ss_type == 1 && model.L !==nothing
-        step_size = 1/model.L
+        step_size = min(1/model.L,1.0)
     elseif method.ss_type == 1 && model.L === nothing
         step_size = 0.5
     elseif method.ss_type == 2 || model.L === nothing

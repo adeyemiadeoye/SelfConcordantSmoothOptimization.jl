@@ -3,17 +3,22 @@ using IntervalSets
 export IntegerOrNothing
 export IntOrFloat
 export VectorOrBitVector
+export VectorOrFloat
+export is_interval_set
+export bounds_sanity_check
 export ProxModel
 export Problem
 
 abstract type ProxModel end
-const OperatorOrArray2 = Union{Function, AbstractArray{Float64,2}}
+const OperatorOrArray2 = Union{Function, AbstractArray{T,2}} where {T<:Real}
 const StringOrNothing = Union{String, Nothing}
 const FuncOrNothing = Union{Function, Nothing}
 const IntegerOrNothing = Union{Integer, Nothing}
 const VectorOrBitVector{T} = Union{BitVector, Vector{T}}
 const IntOrFloat = Union{Int64, Float64}
-const IntervalVectorTupleOrNothing = Union{ClosedInterval{T}, Interval{:closed, :closed, T}, Tuple{T, T}, Vector{T}, Nothing} where {T<:Real}
+const VectorOrFloat = Union{Vector{T}, T} where {T<:Real}
+const IntervalVectorTupleOrNothing = Union{ClosedInterval{T}, Interval{:closed, :closed, T}, Tuple{T, T}, Vector{T}, Vector{Vector{T}}, Nothing} where {T<:Real}
+const is_interval_set(x) = (typeof(x) <: Union{ClosedInterval{<:Real}, Interval{:closed, :closed, <:Real}})
 
 mutable struct Problem <: ProxModel
     A                   # input data
@@ -59,24 +64,36 @@ function get_reg(model::ProxModel, x, reg_name::String)
     elseif reg_name == "l2"
         return model.λ*sum(abs2.(x))
     elseif reg_name == "indbox"
-        lb, ub = minimum(model.C_set), maximum(model.C_set)
-        if !(typeof(model.C_set) <: Union{ClosedInterval{<:Real}, Interval{:closed, :closed, <:Real}})
-            C_set = ClosedInterval{Float64}(lb, ub)
+        if is_interval_set(model.C_set)
+            lb, ub = minimum(model.C_set), maximum(model.C_set)
         else
-            C_set = model.C_set
+            lb, ub = model.C_set[1], model.C_set[2]
         end
         return indbox_f(x, lb, ub)
-        # return sum(map(x -> x ∈ C_set ? 0.0 : Inf, x))
     else
         Base.error("reg_name not valid.")
     end
 end
 
 function indbox_f(x, lb, ub)
-    n = length(x)
-    if any(x .< repeat([lb],n)) || any(x .> repeat([ub],n))
+    if any(x .< lb) || any(x .> ub)
         return Inf
     else
         return 0.0
     end
+end
+
+function bounds_sanity_check(n, lb, ub)
+    na = length(lb)
+    nb = length(ub)
+    if na == 1 && nb == 1
+        a = repeat([lb[1]], n)
+        b = repeat([ub[1]], n)
+    elseif na == n && nb == n
+        a = lb
+        b = ub
+    else
+        Base.error("Lengths of the bounds do not match that of the variable.")
+    end
+    return a, b
 end

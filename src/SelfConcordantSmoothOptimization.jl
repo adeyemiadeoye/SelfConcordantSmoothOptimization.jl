@@ -53,13 +53,17 @@ function iter_step!(method::ProximalMethod, reg_name, model, hμ, As, x, x_prev,
     return Vector{Float64}(step!(method, reg_name, model, hμ, As, x, x_prev, ys, iter))
 end
 
-function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batch_size=nothing, max_iter=1000, x_tol=1e-10, f_tol=1e-10, extra_metrics=false, verbose=0)
+# for each implemented algorithm, add the name field here
+implemented_algs = ["prox-newtonscore", "prox-ggnscore", "prox-bfgsscore"]
+function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batch_size=nothing, max_iter=1000, x_tol=1e-10, f_tol=1e-10, extra_metrics=false, verbose=1)
     N = size(model.y,1)
-    if α !== nothing
-        model.L = 1/α
-    end
-    if method.ss_type == 1 && model.L === nothing
-        @info "Neither L nor α is set for the problem... Now fixing α = 0.5..."
+    if method.name in implemented_algs
+        if α !== nothing
+            model.L = 1/α
+        end
+        if method.ss_type == 1 && model.L === nothing && verbose > 0
+            @info "Neither L nor α is set for the problem... Now fixing α = 0.5..."
+        end
     end
     if batch_size !== nothing && batch_size < N
         data = batch_data(model)
@@ -95,7 +99,7 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
         rel_error = max(norm(x - x_star) / max.(norm(x_star),1), x_tol)
         f_rel_error = max((norm(obj - obj_star))/norm(obj_star), f_tol)
         push!(times, Δtime)
-        if verbose > 0
+        if verbose > 1
             println("Iter $iter \t Loss: $obj \t Time: $Δtime")
             flush(stdout)
         end
@@ -103,7 +107,8 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
         push!(rel_errors, rel_error)
         push!(f_rel_errors, f_rel_error)
 
-        # if we are interested in metrics related to a sparse deconvolution problem
+        # if we are interested in metrics related to some a sparse deconvolution problem
+        # TODO may remove later
         if extra_metrics
             push!(metrics["snr"], snr_metric(model.x, x))
             push!(metrics["psnr"], psnr_metric(model.x, x))

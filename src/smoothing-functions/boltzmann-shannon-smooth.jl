@@ -34,10 +34,10 @@ function bosh_smooth_grad_l1(x; μ=1.0)
 end
 function bosh_smooth_hess_l1(x; μ=1.0) # returns a vector, the diagonal part of bosh_smooth_hess_l1 (a diagonal matrix)
     if x < exp(-1)*μ
-        1e-9
+        eps()
     elseif x == μ*exp(-1) || x < μ*exp(1)
         return 1/x
     else
-        return 1e-9
+        return eps()
     end
 end

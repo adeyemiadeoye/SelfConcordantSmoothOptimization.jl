@@ -59,10 +59,11 @@ solution = iterate!(method, model, reg_name, hμ; max_iter=100, x_tol=1e-6, f_to
 solution.x
 ```
 To use the `ProxGGNSCORE` algorithm, a model output function $\mathcal{M}(A,x)$ is required
-(Note that it is essential to define the function f in two ways as above to use `ProxGGNSCORE`; Julia will decide which one to use at any instance):
+(Note that it is essential to define the function f in two ways to use `ProxGGNSCORE`; Julia will decide which one to use at any instance -- thanks to the multiple dispatch feature):
 ```julia
-# it is essential to also define the function f using the following alternative form;
-# Julia will decide which one to use at any instance (thanks to the multiple dispatch feature)
+# f as defined above
+f(x) = 1/m*sum(log.(1 .+ exp.(-y .* (A*x))));
+# f as a function of y and yhat
 f(y, yhat) = -1/m*sum(y .* log.(yhat) .+ (1 .- y) .* log.(1 .- yhat))
 # where yhat = Mfunc(A, x) is defined by the model output function
 Mfunc(A, x) = 1 ./ (1 .+ exp.(-A*x))
@@ -77,10 +78,12 @@ solution.x
 ```
 By default, this package computes derivatives using [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl). But users can supply functions that compute the derivates involved in the algorithms. This has at least two benefits:
 1. Faster computations
-2. Avoid the need to define two functions for $\mathrm{f}$ when using `ProxGGNSCORE`
+2. Avoid the need to define $\mathrm{f}$ twice when using `ProxGGNSCORE`
 
 In the example above:
 ```julia
+f(x) = 1/m*sum(log.(1 .+ exp.(-y .* (A*x))));
+
 S(x) = exp.(-y .* (A*x));
 # gradient of f wrt x:
 function grad_fx(x)

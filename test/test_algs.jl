@@ -17,8 +17,8 @@
         sol_l1 = iterate!(ProxNSCORE(), model, "l1", PHuberSmootherL1L2(μ))
         sol_l2 = iterate!(ProxNSCORE(), model, "l2", PHuberSmootherL1L2(μ))
         @test model.x ≈ zeros(2)
-        @test length(sol_l1.objrel) > 1
-        @test length(sol_l2.objrel) > 1
+        @test sol_l1.iters+1 > 1
+        @test sol_l2.iters+1 > 1
         @test sol_l1.rel[end] <= TOL
         @test sol_l2.rel[end] <= TOL
         @test sol_l1.objrel[end] <= TOL
@@ -30,8 +30,8 @@
         sol_l1 = iterate!(ProxGGNSCORE(), model, "l1", PHuberSmootherL1L2(μ))
         sol_l2 = iterate!(ProxGGNSCORE(), model, "l2", PHuberSmootherL1L2(μ))
         @test model.x ≈ zeros(2)
-        @test length(sol_l1.objrel) > 1
-        @test length(sol_l2.objrel) > 1
+        @test sol_l1.iters+1 > 1
+        @test sol_l2.iters+1 > 1
         @test sol_l1.rel[end] <= TOL
         @test sol_l2.rel[end] <= TOL
         @test sol_l1.objrel[end] <= TOL
@@ -43,8 +43,8 @@
         sol_l1 = iterate!(ProxQNSCORE(), model, "l1", PHuberSmootherL1L2(μ))
         sol_l2 = iterate!(ProxQNSCORE(), model, "l2", PHuberSmootherL1L2(μ))
         @test model.x == zeros(2)
-        @test length(sol_l1.objrel) > 1
-        @test length(sol_l2.objrel) > 1
+        @test sol_l1.iters+1 > 1
+        @test sol_l2.iters+1 > 1
         @test sol_l1.rel[end] <= TOL
         @test sol_l2.rel[end] <= TOL
         @test sol_l1.objrel[end] <= TOL
@@ -68,7 +68,7 @@ end
     @testset "PHuber indbox" begin
         model = Problem(A, y, x0, f_qp, λ; C_set=(lb, ub), sol=x_star)
         sol = iterate!(ProxNSCORE(), model, "indbox", PHuberSmootherIndBox(lb, ub, μ), α=0.8)
-        @test length(sol.objrel) > 1
+        @test sol.iters+1 > 1
         @test sol.rel[end] <= TOL
         @test sol.objrel[end] <= TOL
     end
@@ -76,7 +76,7 @@ end
     @testset "Exponential indbox" begin
         model = Problem(A, y, x0, f_qp, λ; C_set=(lb, ub), sol=x_star)
         sol = iterate!(ProxNSCORE(), model, "indbox", ExponentialSmootherIndBox(lb, ub, μ), α=0.8)
-        @test length(sol.objrel) > 1
+        @test sol.iters+1 > 1
         @test sol.rel[end] <= TOL
         @test sol.objrel[end] <= TOL
     end

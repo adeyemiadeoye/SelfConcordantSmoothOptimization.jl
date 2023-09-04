@@ -120,7 +120,7 @@ method_ggn = ProxGGNSCORE();
 sol_ggn = iterate!(method_ggn, model_ggn, reg_name, hμ; max_iter=100, x_tol=1e-6, f_tol=1e-6);
 sol_ggn.x
 ```
-TODO: Add a simple sparse group lasso example... (for now, see example from paper).
+TODO: Add a simple sparse group lasso example... (for now, see example from paper in `/examples/paper`).
 
 ## Implementation details and recommendations
 Below is a summary of functions $\mathrm{f}$ supported by the algorithms implemented in the package:

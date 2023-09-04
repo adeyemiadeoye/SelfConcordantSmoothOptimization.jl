@@ -25,8 +25,16 @@ function init!(method::OWLQN, x)
     method.rho = []
     return method
 end
-function step!(method::OWLQN, reg_name, model, hμ, As, x, x_prev, ys, iter)
+function step!(method::OWLQN, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
     f = model.f
+    if length(model.λ) > 1
+        # λ = 1.0 # pre-multiplication will done for more than one regularization function
+        λ = model.λ[1]
+    else
+        λ = model.λ
+    end
+
+    reg_fn = x -> get_reg(model, x, reg_name)
 
     if model.grad_fx !== nothing
         ∇f = x -> model.grad_fx(x)
@@ -47,7 +55,7 @@ function step!(method::OWLQN, reg_name, model, hμ, As, x, x_prev, ys, iter)
     x_copy = deepcopy(x)
     g_copy = deepcopy(g)
     
-    pg = pseudo_gradient(g, x, model.λ)
+    pg = pseudo_gradient(g, x, λ)
     Q = deepcopy(pg)
     
     if m > 0
@@ -72,7 +80,7 @@ function step!(method::OWLQN, reg_name, model, hμ, As, x, x_prev, ys, iter)
         if method.ss_type == 1 && model.L !== nothing
             step_size = 1/model.L
         else
-            step_size, x_new = projected_backtracking_line_search_update(f, pg, x, d, model.λ, reg_name)
+            step_size, x_new = projected_backtracking_line_search_update(f, reg_fn, pg, x, d)
         end
     else
         # fancy way to do  x .-= g
@@ -80,11 +88,11 @@ function step!(method::OWLQN, reg_name, model, hμ, As, x, x_prev, ys, iter)
         if method.ss_type == 1 && model.L !== nothing
             step_size = 1/model.L
         else
-            step_size, x_new = projected_backtracking_line_search_update(f, pg, x, d, model.λ, reg_name; α = 1 / sqrt(pg ⋅ pg), β=0.1)
+            step_size, x_new = projected_backtracking_line_search_update(f, reg_fn, pg, x, d; α = 1 / sqrt(pg ⋅ pg), β=0.1)
         end
     end
 
-    prox_m = invoke_prox(model, reg_name, x - step_size*d, one.(x), model.λ, step_size)
+    prox_m = invoke_prox(model, reg_name, x - step_size*d, one.(x), λ, step_size)
     x_new = prox_step(prox_m)
     
     push!(s, x - x_copy)

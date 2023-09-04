@@ -4,18 +4,14 @@ using DataStructures
 using StatsBase
 
 using Plots; pyplot()
+using Formatting
 using BenchmarkProfiles
-
-using Random
-using Distributions
-function rr()
-    rng = MersenneTwister(1234);
-    return rng
-end
 
 include("splogl1.jl")
 include("spdeconv.jl")
+include("spgrouplasso/spgrouplasso.jl")
 include("benchmark-algos.jl")
+include("load_bcd.jl")
 
 markershape = [:dtriangle :rtriangle :rect :diamond :hexagon :xcross :utriangle :ltriangle :pentagon :heptagon :octagon :star4 :star6 :star7 :star8]
 
@@ -73,26 +69,26 @@ end
 
 # MAIN FUNCTIONS
 function solve!(model_name::String, method_name::String;
-                N=2000, m=300, λ=2.0, ss_type=1, μ=2.0, max_iter=240, x_tol=1e-10, f_tol=1e-10, reg_name="l1", log_reg_problems=nothing, α=nothing, lb=-1.0, ub=1.0, verbose=0)
+                m=2000, n=300, λ=2.0, ss_type=1, μ=2.0, max_iter=240, x_tol=1e-10, f_tol=1e-10, reg_name="l1", log_reg_problems=nothing, α=1.0, lb=-1.0, ub=1.0, grpsize=100, use_const_grpsize=false, verbose=0, seed=1234)
 
     #   model_name : {"sim_log", "w1a", "mushrooms", "deconv"}
-    #   method_name : {"prox-ggnscore", "prox-grad", "prox-newtonscore", "prox-owlqn"}
-    #   N : number of samples for synthetic data if model_name is in {"sim_log", "deconv-l1", "deconv-l2"}
-    #   m : number of features for synthetic data if model_name is in {"sim_log", "deconv-l1", "deconv-l2"}
+    #   method_name : {"prox-ggnscore", "prox-grad", "prox-newtonscore", "prox-owlqn", "panoc", "zerofpr", "f-prox-grad"}
+    #   m : number of samples for synthetic data
+    #   n : number of features for synthetic data
     #   λ : penalty/regularization parameter
     #   ss_type : how to select step length; 1 => use 1/Lipschitz_constant, 2=>use BB step-size, 3=>backtracking line-search
     #   μ : smoothness prameter for SCORE methods
 
     #   max_iter : maximum number of iterations
-    #   reg_name : regularization function to use -> {"l1", "l2"} for now
-    #   batch_size : batch sample size per iteration (currently only implemented for the sparse regression problems) --> nothing === "use full sample points per iteration"
+    #   reg_name : regularization function to use -> e.g. "l1", "l2"
+    #   batch_size (TODO) : batch sample size per iteration (currently not fully implemented) --> nothing === "use full sample points per iteration"
     if log_reg_problems === nothing
         log_reg_problems = vcat(keys(data_dict)...,"sim_log")
     end
+    extra_metrics = false
     if model_name in log_reg_problems # sparse logistic regression problem
-        extra_metrics = false
         if reg_name == "l1"
-            model = SpLogL1(model_name, N, m, λ)
+            model = SpLogL1(model_name, m, n, λ; seed=seed)
             g = NormL1(λ) # g function for benchmark algos
         else
             Base.error("Please choose reg_name='l1'.")
@@ -106,17 +102,13 @@ function solve!(model_name::String, method_name::String;
             model_name = "deconv-l2"
             g = NormL2(λ) # g function for benchmark algos
         else
-            Base.error("Please choose reg_name in {'l1', 'l2', 'indbox'}.")
+            Base.error("Please choose reg_name in {'l1', 'l2'}.")
         end
-        model = SpDeconv(model_name, N, λ)
-    elseif model_name == "boxqp"
-        extra_metrics = false
-        if reg_name == "indbox"
-            model = BoxQP(model_name, N, lb, ub, λ)
-            g = IndBox(lb, ub) # g function for benchmark algos
-        else
-            Base.error("Please choose reg_name='indbox'.")
-        end
+        model = SpDeconv(model_name, m, λ)
+    elseif model_name in glproblems
+        reg_name = "gl"
+        γ = λ
+        model = GroupLasso(model_name, m, n, grpsize, γ, μ; use_const_grpsize=use_const_grpsize)
     else
         Base.error("Please choose model_name in $(vcat(log_reg_problems, "deconv", "boxqp")).")
     end
@@ -141,12 +133,13 @@ function solve!(model_name::String, method_name::String;
     else
         if reg_name in ["l1", "l2"]
             hμ = PHuberSmootherL1L2(μ)
-        elseif reg_name == "indbox"
-            hμ = ExponentialSmootherIndBox(lb, ub, μ)
+        elseif reg_name == "gl"
+            hμ = PHuberSmootherGL(μ, model)
         end
         if method_name == "prox-ggnscore"
             method = ProxGGNSCORE(ss_type=ss_type)
         elseif method_name == "prox-grad"
+            α = nothing
             hμ = NoSmooth(1.0)
             method = ProxGradient(ss_type=ss_type)
         elseif  method_name == "prox-newtonscore"
@@ -154,6 +147,7 @@ function solve!(model_name::String, method_name::String;
         elseif  method_name == "prox-bfgsscore"
             method = ProxQNSCORE(ss_type=ss_type)
         elseif  method_name == "prox-owlqn"
+            α = nothing
             hμ = NoSmooth(1.0)
             method = OWLQN(ss_type=ss_type, m=20)
         else
@@ -170,7 +164,7 @@ end
 function get_density()
     d = Dict()
     for data_name in keys(data_dict)
-        N, m = data_dict[data_name][1]
+        m, n = data_dict[data_name][1]
         ext = data_dict[data_name][2] # file extension
         if data_name == "gisette"
             dataset_path = "examples/paper/data/"*data_name*"_train"
@@ -178,7 +172,7 @@ function get_density()
             y = vec(readdlm(dataset_path*".labels"))
         else
             dataset_path = "examples/paper/data/"*data_name*ext
-            A, y = fetch_data(dataset_path, N, m)
+            A, y = fetch_data(dataset_path, m, n)
         end
         sA = size(A)
         sA = sA[1]*sA[2]
@@ -189,10 +183,14 @@ function get_density()
     return d
 end
 
-function plot_reg()
+function plot_reg(;ex="1")
     file_dir = pwd() * "/examples/paper/figures/"
     g = x -> norm(x, 1)
-    ghμ(μ) = PHuberSmootherL1L2(μ).val
+    if ex == "1"
+        ghμ = (μ) -> PHuberSmootherL1L2(μ).val
+    else
+        ghμ = (μ) -> OsBaSmootherL1(μ).val
+    end
     p = plot([g ghμ(0.2) ghμ(0.5) ghμ(1.0)], label=["\$g\$" "\$g □ h_{0.2}\$" "\$g □ h_{0.5}\$" "\$g □ h_{1.0}\$"], legend=:top)
 
     savefig(p, file_dir * "g_smooth" * ".pdf")
@@ -202,41 +200,40 @@ end
 
 
 function RUNPaperExperiments()
-    problems_list = ["sim_log", "a1a", "a2a", "a3a", "a4a", "a5a", "mushrooms", "deconv"]
+    problems_list = ["sim_log", "a1a", "a2a", "a3a", "a4a", "a5a", "mushrooms", "deconv", "sim_gl"]
     log_reg_problems = problems_list[1:end-1]
-    # methods_list = ["prox-newtonscore", "prox-ggnscore", "panoc", "zerofpr", "prox-owlqn", "prox-grad", "f-prox-grad", "prox-bfgsscore"]
     methods_list = ["prox-newtonscore", "prox-ggnscore", "panoc", "zerofpr", "prox-owlqn", "prox-grad", "f-prox-grad"]
     reg_list = ["l1", "l2"]
 
     results = []
-    m = 200
+    n = 4000
     for model_name in problems_list
         for method_name in methods_list
             if model_name in log_reg_problems
-                N = 2000
+                m = 100
                 reg_name = reg_list[1]
                 if model_name == "sim_log"
                     λ = 2.0e-1
-                    μ = 2.0
+                    μ = 1.0
                 else
-                    λ = 8e-1
-                    μ = 5.0
+                    λ = 1.0
+                    μ = 1.0
                 end
-                max_iter = 500
+                max_iter = 2000
                 @info "Now solving problem $model_name using $method_name..."
-                model, method_label, sol = solve!(model_name, method_name; N=N, m=m, λ=λ, μ=μ, max_iter=max_iter, reg_name=reg_name, log_reg_problems=log_reg_problems)
+                model, method_label, sol = solve!(model_name, method_name; m=m, n=n, λ=λ, μ=μ, max_iter=max_iter, reg_name=reg_name, log_reg_problems=log_reg_problems)
                 push!(results, (model, method_name, method_label, sol))
             else
                 x_tol = 1e-6
                 f_tol = 1e-6
                 if method_name in ["zerofpr", "panoc", "f-prox-grad", "prox-ggnscore", "prox-grad", "prox-newtonscore"]
-                    N = 512
-                    λ = 2.0e-2
-                    μ = 1.5
-                    max_iter = 50
+                    m = 1024
+                    λ = 1e-3
+                    μ = 5e-2
+                    max_iter = 5000
                     for reg_name in reg_list
                         @info "Now solving problem $model_name using $method_name, reg: $reg_name..."
-                        model, method_label, sol = solve!(model_name, method_name; N=N, m=m, λ=λ, μ=μ, max_iter=max_iter, reg_name=reg_name, log_reg_problems=log_reg_problems, x_tol=x_tol, f_tol=f_tol)
+                        model, method_label, sol = solve!(model_name, method_name; m=m, n=n, λ=λ, μ=μ, max_iter=max_iter, reg_name=reg_name, log_reg_problems=log_reg_problems, x_tol=x_tol, f_tol=f_tol)
                         push!(results, (model, method_name, method_label, sol))
                     end
                 end
@@ -248,28 +245,26 @@ function RUNPaperExperiments()
 
 end
 
-function RUNPaperExperiments_α()
+function RUNPaperExperiments_α(m, n)
     file_dir = pwd() * "/examples/paper/figures/"
 
     problems_list = ["sim_log", "mushrooms"]
-    methods_list = ["prox-newtonscore", "prox-ggnscore"]
-    alpha_list = [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, nothing]
+    methods_list = ["prox-ggnscore", "prox-newtonscore"]
+    alpha_list = [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0]
     reg_name = "l1"
-
-    N = 2000
-    m = 200
-    max_iter = 500
+    
+    max_iter = 2000
     for model_name in problems_list
         if model_name == "sim_log"
-            pre_dir = "$(N)_$(m)_alpha"
-            alias_name = "synthetic dataset: \$m=$N\$, \$n=$m\$"
-            λ = 2.0e-1
-            μ = 2.0
+            pre_dir = "$(m)_$(n)_alpha"
+            alias_name = "synthetic dataset: \$m=$m\$, \$n=$n\$"
+            λ = 2e-1
+            μ = 1.
         else
             pre_dir = "alpha"
             alias_name = model_name * " dataset: \$m=$(data_dict[model_name][1][1])\$, \$n=$(data_dict[model_name][1][2])\$"
-            λ = 8e-1
-            μ = 5.0
+            λ = 1.
+            μ = 1.
         end
 
         for method_name in methods_list
@@ -279,7 +274,7 @@ function RUNPaperExperiments_α()
             f_rel_ns = []
             for α in alpha_list
                 @info "Now solving problem $model_name using $method_name with α = $α..."
-                model, method_label, sol = solve!(model_name, method_name; N=N, m=m, λ=λ, μ=μ, max_iter=max_iter, reg_name=reg_name, log_reg_problems=problems_list, α=α)
+                model, method_label, sol = solve!(model_name, method_name; m=m, n=n, λ=λ, μ=μ, max_iter=max_iter, reg_name=reg_name, log_reg_problems=problems_list, α=α)
                 objrel = sol.objrel
                 push!(f_rel_ns, length(objrel))
                 push!(frel, objrel)
@@ -287,7 +282,7 @@ function RUNPaperExperiments_α()
                 if α !== nothing
                     use_this_label = method_label*": \$\\alpha = $α\$"
                 else
-                    use_this_label = method_label*": \$\\alpha = 1/L\$"
+                    use_this_label = method_label*": \$\\alpha = \\max\\{1/L,1\\}\$"
                 end
                 push!(labels, use_this_label)
             end
@@ -306,12 +301,84 @@ function RUNPaperExperiments_α()
 
 end
 
-function plot_performance_profile()
-    local labels
+function RUNPaperExperiments_SGL(m, n)
+    local model, sol_x, obj, mse, num_nz, t
+
+    file_dir = pwd() * "/examples/paper/figures/"
+
+    methods_list = ["prox-ggnscore", "prox-grad", "bcd"]
+
+    if n <= 2000
+        μ = 1.2
+    elseif n == 10000
+        μ = 1.5
+    else
+        μ = 1.6
+    end
+
+    model_name = "sim_gl"
+    grpsize = 100
+    use_const_grpsize = true
+
+    result = Dict(method_name=>OrderedDict() for method_name in methods_list)
+    labels = String[]
+    plt_title = "\$m=$m\$, \$n=$n\$"
+
+    mses = []
+    mse_ns = []
+
+    for method_name in methods_list
+        if method_name in ["prox-ggnscore", "prox-newtonscore", "prox-bfgsscore"]
+            α = 1
+            λ = 1e-8
+        else
+            α = nothing
+            λ = 1e-7
+        end
+        @info "Now solving problem $model_name using $method_name..."
+        if method_name == "bcd"
+            method_label = "BCD"
+            γ = λ
+            model = GroupLasso(model_name, m, n, grpsize, γ, μ; use_const_grpsize=use_const_grpsize)
+            sol_x, obj, mse, num_nz, t = load_bcd_result(model);
+        else
+            model, method_label, sol = solve!(model_name, method_name; m=m, n=n, λ=λ, μ=μ, max_iter=100000, reg_name="gl", grpsize=grpsize, use_const_grpsize=use_const_grpsize, ss_type=1, verbose=2, x_tol=1e-9, α=α)
+            obj = sol.obj
+            mse = sol.rel
+            sol_x = sol.x
+            num_nz = nnz(sparse(sol_x))
+            t = sol.times[end]
+        end
+
+        push!(mses, mse)
+        push!(mse_ns, length(mse))
+
+        push!(labels, method_label)
+
+        result[method_name]["obj"] = sprintf1("%.4E",obj[end])
+        result[method_name]["mse"] = sprintf1("%.4E",mse[end])
+        result[method_name]["nnz"] = num_nz
+        result[method_name]["time"] = sprintf1("%.2f",t)
+    end
+
+    labels = reshape(labels, (1,length(labels)))
+
+    max_n = maximum(mse_ns)
+    max_n = Int(round(max_n/min(max_n,10^2), digits=0))
+
+    mseplot = plot(mses, label=labels, ylabel="MSE", xlabel="iteration number, \$k\$", xscale=:log10, yscale=:log10, title="$plt_title", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xlims=(-Inf,Inf), xticks=3)
+
+    savefig(mseplot, file_dir * "_$(m)_$(n)_mseplot_" * model_name * ".pdf")
+
+    return result, model.x
+end
+
+function plot_performance_profile(;n_runs=20)
+    local labels, method_label
     file_dir = pwd() * "/examples/paper/figures/"
 
     problems_list = keys(data_dict)
-    methods_list = [Dict("prox-newtonscore"=>0.2), "prox-newtonscore", "panoc", "zerofpr", "prox-owlqn", "prox-grad", "f-prox-grad"]
+    methods_list = [Dict("prox-newtonscore"=>0.2), Dict("prox-newtonscore"=>0.5), Dict("prox-newtonscore"=>1.0), "panoc", "zerofpr", "prox-owlqn", "prox-grad", "f-prox-grad"]
     reg_name = "l1"
 
     n_probs = length(problems_list)
@@ -320,21 +387,21 @@ function plot_performance_profile()
     display(d)
 
     T_all = Dict(name=>OrderedDict() for name in problems_list)
-    It_all = Dict(name=>OrderedDict() for name in problems_list)
+    # It_all = Dict(name=>OrderedDict() for name in problems_list)
 
     T = []
-    It = []
+    # It = []
 
     i = 1
     max_iter = 500
     for model_name in problems_list
         labels = String[]
         if model_name == "sim_log"
-            λ = 2.0e-1
-            μ = 2.0
+            λ = 2e-1
+            μ = 1.
         else
-            λ = 8e-1
-            μ = 5.0
+            λ = 1.
+            μ = 1.
         end
 
         for method_name in methods_list
@@ -346,38 +413,42 @@ function plot_performance_profile()
                 use_method_name = method_name
             end
             @info "Now solving problem $model_name using $use_method_name..."
-            model, method_label, sol = solve!(model_name, use_method_name; λ=λ, μ=μ, max_iter=max_iter, reg_name=reg_name, log_reg_problems=problems_list, α=α, x_tol=1e-6, f_tol=1e-6)
+            m_times = []
+            for run_i in 1:n_runs
+                model, method_label, sol = solve!(model_name, use_method_name; λ=λ, μ=μ, max_iter=max_iter, reg_name=reg_name, log_reg_problems=problems_list, α=α, x_tol=1e-6, f_tol=1e-6, seed=run_i)
+                push!(m_times, sol.times[end])
+            end
 
             if typeof(method_name) == Dict{String, Float64}
                 use_this_label = method_label*": \$\\alpha = $α\$"
             elseif method_name in ["prox-newtonscore", "prox-bfgsscore", "prox-ggnscore"]
-                use_this_label = method_label*": \$\\alpha = 1/L\$"
+                use_this_label = method_label*": \$\\alpha = \\max\\{1/L,1\\}\$"
             else
                 use_this_label = method_label
             end
 
             push!(labels, use_this_label)
 
-            m_time = sol.times[end]
-            m_iter = float(length(sol.times))
+            m_time = mean(m_times)
+            # m_iter = float(length(sol.times))
             if i <= n_probs
                 T_all[model_name][use_this_label] = [m_time]
-                It_all[model_name][use_this_label] = [m_iter]
+                # It_all[model_name][use_this_label] = [m_iter]
             else
                 push!(T_all[model_name][use_this_label], m_time)
-                push!(It_all[model_name][use_this_label], m_iter)
+                # push!(It_all[model_name][use_this_label], m_iter)
             end
         end
         i += 1
     end
     for label in labels
         method_times = reduce(vcat, [T_all[name][label] for name in problems_list])
-        method_iters = reduce(vcat, [It_all[name][label] for name in problems_list])
+        # method_iters = reduce(vcat, [It_all[name][label] for name in problems_list])
         push!(T, method_times)
-        push!(It, method_iters)
+        # push!(It, method_iters)
     end
 
-    perfp = performance_profile(PlotsBackend(), reduce(hcat, T), labels; xlabel="\$\\tau\$", ylabel="\$\\rho(\\tau)\$", linestyle=:auto, legend=:bottomright, _plot_args...)
+    perfp = performance_profile(PlotsBackend(), reduce(hcat, T), labels; logscale=false, xlabel="\$\\tau\$", ylabel="\$\\rho(\\tau)\$", linestyle=:auto, legend=:bottomright, _plot_args...)
 
     savefig(perfp, file_dir * "perf_profile" * ".pdf")
 
@@ -395,8 +466,8 @@ function plot_allresults(results)
     all_relp = Dict(model.name=>OrderedDict() for (model, _, _, _) in results)
     all_frelp = Dict(model.name=>OrderedDict() for (model, _, _, _) in results)
     all_timesp = Dict(model.name=>OrderedDict() for (model, _, _, _) in results)
+    all_msesp = Dict(model.name=>OrderedDict() for (model, _, _, _) in results)
 
-    metrics_snrp = Dict(model.name=>OrderedDict() for (model, _, _, _) in results)
     metrics_psnrp = Dict(model.name=>OrderedDict() for (model, _, _, _) in results)
     metrics_msep = Dict(model.name=>OrderedDict() for (model, _, _, _) in results)
     metrics_rep = Dict(model.name=>OrderedDict() for (model, _, _, _) in results)
@@ -410,12 +481,13 @@ function plot_allresults(results)
             data_x = model.x
             data_y = model.y
 
-            metrics_snrp[model.name][method_label] = sol.metrics["snr"]
             metrics_psnrp[model.name][method_label] = sol.metrics["psnr"]
             metrics_msep[model.name][method_label] = sol.metrics["mse"]
             metrics_rep[model.name][method_label] = sol.metrics["re"]
             metrics_splevelp[model.name][method_label] = sol.metrics["sparsity_level"]
             deconv_solp[model.name][method_label] = sol.x
+
+            all_msesp[model.name][method_label] = sol.metrics["mse"][end]
         end
 
         all_relp[model.name][method_label] = sol.rel
@@ -435,8 +507,8 @@ function plot_allresults(results)
 
 
 
-        if model_name == "sim_log"
-            alias_name = "synthetic dataset: \$m=2000\$, \$n=200\$"
+        if model_name in ["sim_log", "sim_gl"]
+            alias_name = "synthetic dataset: \$m=4000\$, \$n=100\$"
         elseif model_name in ["deconv-l1", "deconv-l2"]
             alias_name = ""
         else
@@ -463,7 +535,7 @@ function plot_allresults(results)
         all_timesplot = plot([all_timesp[model_name][method] for method in keys(all_timesp[model_name]) if method != "Prox-GGN-SCORE"], [all_relp[model_name][method] for method in keys(all_relp[model_name]) if method != "Prox-GGN-SCORE"], label=label_t, ylabel="\$\\|\\mathcal{L}_k-\\mathcal{L}^*\\| / \\|\\mathcal{L}^*\\|\$", xlabel="time [s]", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xlims=(-Inf,Inf))
         savefig(all_timesplot, file_dir * "timesplot" * "_" * model_name * ".pdf")
 
-        all_relplot = plot([all_relp[model_name][method] for method in keys(all_relp[model_name])], label=label, ylabel="\$\\frac{\\|x_k-x^*\\|}{\\max\\{\\|x^*\\|,1\\}}\$", xlabel="iteration number, \$k\$", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xlims=(-Inf,Inf), xticks=0:max_n:10000)
+        all_relplot = plot([all_relp[model_name][method] for method in keys(all_relp[model_name])], label=label, ylabel="\$\\|x_k-x^*\\|/\\max\\{\\|x^*\\|,1\\}\$", xlabel="iteration number, \$k\$", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xlims=(-Inf,Inf), xticks=0:max_n:10000)
         savefig(all_relplot, file_dir * "relplot" * "_" * model_name * ".pdf")
 
 
@@ -471,24 +543,19 @@ function plot_allresults(results)
             label = [keys(deconv_solp[model_name])...]
             n = length(label)
             label = reshape(label, (1,n))
-            # snrs = [metrics_snrp[model_name][method][end] for method in keys(metrics_snrp[model_name])]
-            ts = [all_timesp[model_name][method][end] for method in keys(metrics_snrp[model_name])]
-            iters = [length(all_timesp[model_name][method]) for method in keys(metrics_snrp[model_name])]
-            names_its_ts = [(label[i], iters[i], ts[i]) for i in 1:n]
-            title = reshape(vcat(["", ""], [l*", \$\\beta = $β\$, Iter: $i, CPU time [s]: $(round(t, digits=2))" for (l,i,t) in names_its_ts]), (1, n+2))
+            ts = [all_timesp[model_name][method][end] for method in keys(metrics_psnrp[model_name])]
+            iters = [length(all_timesp[model_name][method]) for method in keys(metrics_psnrp[model_name])]
+            mses = [all_msesp[model_name][method][end] for method in keys(metrics_psnrp[model_name])]
+            names_its_ts_mses = [(label[i], iters[i], mses[i], ts[i]) for i in 1:n]
+            title = reshape(vcat(["", ""], [l*", Iter: $i, MSE: $(sprintf1("%.4E",m)), Time [s]: $(round(t, digits=2))" for (l,i,m,t) in names_its_ts_mses]), (1, n+2))
 
             # plot solutions
             sol_p = [data_x, data_y]
             for method in keys(deconv_solp[model_name])
                 push!(sol_p, deconv_solp[model_name][method])
             end
-            # A = randn(rr(), N, m)
             deconv_solplot = plot(sol_p, layout=(Int((n+2)/2),2), label=["original" "noisy" "" "" "" "" "" ""], title=title, titlefontsize=10, size=(1000, 500), legend=:bottomright)
             savefig(deconv_solplot, file_dir * "sol" * "_" * model_name * ".pdf")
-
-            # plot metrics
-            metrics_snrplot = plot([metrics_snrp[model_name][method] for method in keys(metrics_snrp[model_name])], label=label, ylabel="SNR [dB]", xlabel="iteration number, \$k\$", size=(450, 250))
-            savefig(metrics_snrplot, file_dir * "snrplot" * "_" * model_name * ".pdf")
 
             metrics_psnrplot = plot([metrics_psnrp[model_name][method] for method in keys(metrics_psnrp[model_name])], label=label, ylabel="PSNR [dB]", xlabel="iteration number, \$k\$", size=(450, 250))
             savefig(metrics_psnrplot, file_dir * "psnrplot" * "_" * model_name * ".pdf")

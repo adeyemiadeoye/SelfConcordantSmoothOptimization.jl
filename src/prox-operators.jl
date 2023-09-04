@@ -1,10 +1,14 @@
-
 struct scaled_proximal_l1{D,T,A,S}
     model::ProxModel
     x::D
     h_scale::T
     λ::A
     α::S
+end
+function prox_step(proxh::scaled_proximal_l1)
+    (; model, x, h_scale, λ, α) = proxh
+    t = α * λ ./ h_scale
+    return sign.(x) .* max.(abs.(x) .- t, 0)
 end
 
 struct scaled_proximal_l2{D,T,A,S}
@@ -14,6 +18,11 @@ struct scaled_proximal_l2{D,T,A,S}
     λ::A
     α::S
 end
+function prox_step(proxh::scaled_proximal_l2)
+    (; model, x, h_scale, λ, α) = proxh
+    t = α * λ ./ h_scale
+    return x .* max.(1 .- t ./ abs2.(x), 0)
+end
 
 struct scaled_proximal_indbox{D,T,A,S}
     model::ProxModel
@@ -22,19 +31,6 @@ struct scaled_proximal_indbox{D,T,A,S}
     λ::A
     α::S
 end
-
-function prox_step(proxh::scaled_proximal_l1)
-    (; model, x, h_scale, λ, α) = proxh
-    t = α * h_scale * λ
-    return sign.(x) .* max.(abs.(x) .- t, 0)
-end
-
-function prox_step(proxh::scaled_proximal_l2)
-    (; model, x, h_scale, λ, α) = proxh
-    t = α * h_scale * λ
-    return x .* max.(1 .- t ./ abs2.(x), 0)
-end
-
 function prox_step(proxh::scaled_proximal_indbox)
     (; model, x, h_scale, λ, α) = proxh
     if is_interval_set(model.C_set)
@@ -45,6 +41,36 @@ function prox_step(proxh::scaled_proximal_indbox)
     return min.(max.(x, lb), ub)
 end
 
+struct scaled_proximal_grouplasso{D,T,A,S}
+    model::ProxModel
+    x::D
+    h_scale::T
+    λ::A
+    α::S
+end
+function prox_step(proxh::scaled_proximal_grouplasso)
+    (; model, x, h_scale, λ, α) = proxh
+    # the value of λ that this function takes is typically 1.0,
+    # so we ignore this and get the true value from the model
+    P = model.P
+    λ1, λ2 = model.λ[1], model.λ[2]
+    t = λ1 ./ h_scale
+
+    utmp = sign.(x) .* max.(abs.(x) .- t, 0) # ProxL1
+    u = P.ProxL2(utmp, α*λ2, h_scale) # ProxL2
+
+    #### Alternatively:
+    # Prox_L1
+    # utmp = max.(0, x .- t) .- max.(0, -x .- t)
+    # u = P.times(utmp)
+
+    # # Proj_L2
+    # u = P.ProjL2(u, α*λ2, h_scale)
+    # u = utmp - P.trans(u)
+
+    return u
+end
+
 function invoke_prox(model::ProxModel, reg_name::String, x, h, λ, α)
     if reg_name == "l1"
         return scaled_proximal_l1(model, x, h, λ, α)
@@ -52,6 +78,8 @@ function invoke_prox(model::ProxModel, reg_name::String, x, h, λ, α)
         return scaled_proximal_l2(model, x, h, λ, α)
     elseif reg_name == "indbox"
         return scaled_proximal_indbox(model, x, h, λ, α)
+    elseif reg_name == "gl"
+        return scaled_proximal_grouplasso(model, x, h, λ, α)
     else
         Base.error("reg_name not valid.")
     end

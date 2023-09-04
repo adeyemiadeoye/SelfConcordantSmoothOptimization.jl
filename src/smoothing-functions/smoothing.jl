@@ -10,14 +10,14 @@ mutable struct NoSmooth <: Smoother
     hess
 end
 
-NoSmooth(μ::IntOrFloat) = NoSmooth(μ, x->zero(x), x->zero(x), x->1e-6 .* one.(x))
+NoSmooth(μ::IntOrFloat) = NoSmooth(μ, x->zero(x), x->zero(x), x->eps()*one.(x))
 
 
 function get_Mg(Mh::IntOrFloat, ν::IntOrFloat, μ::IntOrFloat, n::Int)
     if Mh < 0
         Base.error("Mh must be nonnegative.")
     elseif μ <= 0
-        Base.error("mu must be positive.")
+        Base.error("μ must be positive.")
     end
 
     if 0 < ν <= 3

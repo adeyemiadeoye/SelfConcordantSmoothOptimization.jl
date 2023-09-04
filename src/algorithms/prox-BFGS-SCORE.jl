@@ -13,12 +13,18 @@ function init!(method::ProxQNSCORE, x)
 	method.H = Matrix{Float64}(I, size(x,1), size(x,1))
 	return method
 end
-function step!(method::ProxQNSCORE, reg_name, model, hμ, As, x, x_prev, ys, iter)
+function step!(method::ProxQNSCORE, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
+    if length(model.λ) > 1
+        # λ = 1.0 # pre-multiplication will done for more than one regularization function
+        λ = model.λ[1]
+    else
+        λ = model.λ
+    end
     H = method.H
-    gr = hμ.grad(x)
-    λgr = model.λ .* gr
-    Hr_diag = hμ.hess(x)
-    λHr = model.λ .* Diagonal(Hr_diag)
+    gr = hμ.grad(Cmat,x)
+    λgr = λ .* gr
+    Hr_diag = hμ.hess(Cmat,x)
+    λHr = λ .* Diagonal(Hr_diag)
     obj = x -> model.f(x) + get_reg(model, x, reg_name)
     if model.grad_fx !== nothing
         grad_f = x -> model.grad_fx(x)
@@ -36,7 +42,7 @@ function step!(method::ProxQNSCORE, reg_name, model, hμ, As, x, x_prev, ys, ite
         if iter == 1
             step_size = 1
         else
-            λgr_prev = model.λ .* hμ.grad(x_prev)
+            λgr_prev = λ .* hμ.grad(x_prev)
             ∇f_prev = grad_f(x_prev) + λgr_prev
             step_size = inv_BB_step(x, x_prev, ∇f, ∇f_prev) # inverse of the original BB step-size
         end
@@ -57,7 +63,7 @@ function step!(method::ProxQNSCORE, reg_name, model, hμ, As, x, x_prev, ys, ite
     # ensure αₖ satisfies the theoretical condition
     # (actually satisfies it for many convex problems)
     safe_α = min(1, α)
-    prox_m = invoke_prox(model, reg_name, x + safe_α*d, Hdiag_inv, model.λ, step_size)
+    prox_m = invoke_prox(model, reg_name, x + safe_α*d, Hdiag_inv, λ, step_size)
     x_new = prox_step(prox_m)
 
     ∇f_new = grad_f(x_new)

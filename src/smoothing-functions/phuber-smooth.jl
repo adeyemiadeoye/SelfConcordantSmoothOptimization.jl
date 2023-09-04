@@ -1,5 +1,8 @@
 # pseudo-Huber smoothing function
 
+const huber_smooth_Mh = 2.0
+const huber_smooth_ν = 2.6
+
 mutable struct PHuberSmootherL1L2 <: Smoother
     μ
     Mh
@@ -7,6 +10,16 @@ mutable struct PHuberSmootherL1L2 <: Smoother
     val
     grad
     hess
+end
+PHuberSmootherL1L2(mu::IntOrFloat; val=x->pseudo_huber.(x;μ=mu), grad=(Cmat,x)->huber_grad.(x;μ=mu), hess=(Cmat,x)->huber_hess.(x;μ=mu)) = PHuberSmootherL1L2(mu, huber_smooth_Mh, huber_smooth_ν, val, grad, hess)
+function pseudo_huber(x; μ=1.0, λ=1.0)
+    return (μ^2 - μ*sqrt(μ^2 + x^2) + x^2)*(μ^2 + x^2)^(-1/2)
+end
+function huber_grad(x; μ=1.0, λ=1.0)
+    x * (μ^2 + x^2)^-(1/2)
+end
+function huber_hess(x; μ=1.0, λ=1.0) # returns a vector, the diagonal part of huber_hess (a diagonal matrix)
+    μ^2 * (μ^2 + x^2)^-(3/2)
 end
 
 mutable struct PHuberSmootherIndBox <: Smoother
@@ -17,11 +30,6 @@ mutable struct PHuberSmootherIndBox <: Smoother
     grad
     hess
 end
-
-const huber_smooth_Mh = 2.0
-const huber_smooth_ν = 2.6
-
-PHuberSmootherL1L2(mu::IntOrFloat; val=x->pseudo_huber.(x;μ=mu), grad=x->huber_grad.(x;μ=mu), hess=x->huber_hess.(x;μ=mu)) = PHuberSmootherL1L2(mu, huber_smooth_Mh, huber_smooth_ν, val, grad, hess)
 function PHuberSmootherIndBox(lb::VectorOrFloat, ub::VectorOrFloat, mu::IntOrFloat)
     val = x -> pseudo_huber_indbox(x;μ=mu,lb=lb,ub=ub)
     grad = x -> huber_grad_indbox(x;μ=mu,lb=lb,ub=ub)
@@ -29,17 +37,6 @@ function PHuberSmootherIndBox(lb::VectorOrFloat, ub::VectorOrFloat, mu::IntOrFlo
     
     return PHuberSmootherIndBox(mu, huber_smooth_Mh, huber_smooth_ν, val, grad, hess)
 end
-
-function pseudo_huber(x; μ=1.0)
-    return (μ^2 - μ*sqrt(μ^2 + x^2) + x^2)*(μ^2 + x^2)^(-1/2)
-end
-function huber_grad(x; μ=1.0)
-    x * ((μ^2 + x^2)^-(1/2))
-end
-function huber_hess(x; μ=1.0) # returns a vector, the diagonal part of huber_hess (a diagonal matrix)
-    μ^2 * ((μ^2 + x^2)^-(3/2))
-end
-
 function pseudo_huber_indbox(x; μ=1.0,lb=0.0,ub=1.0)
     n = size(x,1)
     h = Vector{Float64}(undef, n)
@@ -88,4 +85,67 @@ function huber_hess_indbox(x; μ=1.0,lb=0.0,ub=1.0) # returns a vector, the diag
         end
     end
     return h
+end
+
+mutable struct PHuberSmootherGL <: Smoother
+    μ
+    Mh
+    ν
+    val
+    grad
+    hess
+end
+function PHuberSmootherGL(mu::IntOrFloat, model)
+    λ = model.λ
+    P = model.P
+    inds = P.ind
+    grpNUM = P.grpNUM
+    λ1, λ2 = λ[1], λ[2]
+    
+    val = x -> get_infconvHuberL2L1(x, λ1, λ2, inds, grpNUM, mu)
+    grad = (Cmat,x) -> huber_l2l1_grad(Cmat, x, λ1, λ2, inds, grpNUM, mu)
+    hess = (Cmat,x) -> huber_l2l1_hess(Cmat, x, λ1, λ2, inds, grpNUM, mu)
+    return PHuberSmootherGL(mu, huber_smooth_Mh, huber_smooth_ν, val, grad, hess)
+end
+
+function huber_l2l1_grad(Cmat, x, λ1, λ2, inds, grpNUM, μ)
+    g_mu1 = pseudo_huber.(x;μ=μ,λ=1)
+    Dg_mu1 = huber_grad.(x;μ=μ,λ=1)
+
+    return huber_grad.(Cmat*g_mu1;μ=μ,λ=1).*Dg_mu1
+end
+function huber_l2l1_hess(Cmat, x, λ1, λ2, inds, grpNUM, μ)
+    g_mu1 = pseudo_huber.(x;μ=μ,λ=1)
+    Dg_mu1 = huber_grad.(x;μ=μ,λ=1)
+    DDg_mu1 = huber_hess.(x;μ=μ,λ=1)
+
+    DDgg = huber_hess.(Cmat*g_mu1;μ=μ,λ=1)*dot(Dg_mu1,Dg_mu1) .+ huber_grad.(Cmat*g_mu1;μ=μ,λ=1).*DDg_mu1
+
+    return DDgg
+end
+
+function infconvHuberNorm(x::Vector{Float64}, λ::IntOrFloat, inds::Matrix{Int}, grpNUM::Int, μ::IntOrFloat)
+    ICz = similar(x)
+
+    ind = reduce(vcat, inds)
+
+    for j in 1:grpNUM
+        λw = λ * ind[2+3*(j-1)+1]
+        kstart = Int(ind[3*(j-1)+1])
+        kend = Int(ind[1+3*(j-1)+1])
+        nrm = normfun(x, kstart, kend)
+
+        for k in kstart:kend
+            ICz[k] = x[k] * max(1 - λw / nrm, 0)
+            ICz[k] = pseudo_huber(ICz[k]; μ=μ, λ=λw)
+        end
+    end
+
+    return ICz
+end
+
+function get_infconvHuberL2L1(x, λ1, λ2, inds, grpNUM, μ)
+    utmp = infconvHuberNorm(x, λ1, inds, grpNUM, μ)
+    z = infconvHuberNorm(utmp, λ2, inds, grpNUM, μ)
+    return z
 end

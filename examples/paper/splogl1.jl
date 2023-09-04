@@ -1,17 +1,18 @@
 using LinearAlgebra, SparseArrays
+using Random, Distributions
 
-function rr()
-    rng = MersenneTwister(1234);
+function rr(;seed=1234)
+    rng = MersenneTwister(seed);
     return rng
 end
 
+Random.seed!(1234)
+
 # SPARSE LOGISTIC REGRESSION PROBLEM
 
-# Sparse Logistic Regression with L1 norm
-
-function SpLogL1(data_name::String, N::IntegerOrNothing, m::IntegerOrNothing, λ::Float64)
-    A, y, x0, x_star = init_Log_model(data_name; N, m) # data_name == "sim_log" or a real dataset name
-    Lf = eigmax(1/N * (A'*A))
+function SpLogL1(data_name::String, m::Integer, n::Integer, λ; seed=1234)
+    A, y, x0, x_star = init_Log_model(data_name; m=m, n=n, seed=seed) # data_name == "sim_log" or a real dataset name
+    Lf = eigmax(1/m * (A'*A))
     grad_fx, hess_fx, jac_yx, grad_fy, hess_fy = get_derivative_fns_splog(A, y)
     f = x -> f_splog(A, x, y)
     return Problem(A, y, x0, f, λ; Lf=Lf, sol=x_star, out_fn=out_splog, grad_fx=grad_fx, hess_fx=hess_fx, jac_yx=jac_yx, grad_fy=grad_fy, hess_fy=hess_fy, name=data_name)
@@ -49,21 +50,28 @@ data_dict = Dict(
     "phishing" => [(11055, 68), ".txt"]
     )
 
-function init_Log_model(data_name; N=1000, m=100)
-    # N : number of samples
-    # m : number of features
+function init_Log_model(data_name; m=1000, n=100, seed=1234)
+    # m : number of samples
+    # n : number of features
+
+    Random.seed!(seed)
 
     if data_name == "sim_log"
-        A = Matrix(sprandn(rr(), N, m, 0.75))
-        true_coef = zeros(m)
+        if m > n
+            density = 0.85
+        else
+            density = 0.1
+        end
+        A = Matrix(sprandn(rr(seed=seed), m, n, density))
+        true_coef = zeros(n)
         y_prob = 1 ./ (1 .+ exp.(-A * true_coef))
-        y = rand.(rr(), Bernoulli.(y_prob))
+        y = rand.(rr(seed=seed), Bernoulli.(y_prob))
         unique_y = unique(y)
         y = map(x -> x==unique_y[1] ? -1 : 1, y)
-        x0 = rand(rr(), m)
+        x0 = rand(rr(seed=seed), n)
         x_star = true_coef
     else
-        N, m = data_dict[data_name][1]
+        m, n = data_dict[data_name][1]
         ext = data_dict[data_name][2] # file extension
         if ext == ".bz2"
             dataset_path = "examples/paper/data/"*data_name*"_train"
@@ -71,25 +79,25 @@ function init_Log_model(data_name; N=1000, m=100)
             y = vec(readdlm(dataset_path*".labels"))
         else
             dataset_path = "examples/paper/data/"*data_name*ext
-            A, y = fetch_data(dataset_path, N, m)
+            A, y = fetch_data(dataset_path, m, n)
         end
         unique_y = unique(y)
         y = map(x -> x==unique_y[1] ? -1 : 1, y)
-        x0 = rand(rr(), m)
-        x_star = zeros(m)
+        x0 = rand(rr(seed=seed), n)
+        x_star = zeros(n)
     end
 
 	return A, y, x0, x_star
 end
 
 function batch_data(model::ProxModel)
-    N = size(model.y, 1)
-    return [(model.A[i,:],model.y[i]) for i in 1:N]
+    m = size(model.y, 1)
+    return [(model.A[i,:],model.y[i]) for i in 1:m]
 end
 
-function sample_batch(data, m)
-    # m : batch_size
-    s = sample(data,m,replace=false,ordered=true)
+function sample_batch(data, mb)
+    # mb : batch_size
+    s = sample(data,mb,replace=false,ordered=true)
     As = Array(hcat(map(x->x[1], s)...)')
     ys = Array(hcat(map(x->x[2], s)...)')
 
@@ -99,7 +107,7 @@ end
 # adapted from https://github.com/TheoGuyard/LIBSVMdata.jl/blob/f20a70703f16044c5c9da8046fcc0d3ca7428d00/src/LIBSVMdata.jl#L84
 # the LIBSVMdata.jl package which is released under MIT license
 # the main LIBSVMdata.jl package throws some HTTP error on an Ubuntu system, so I don't use it directly
-function fetch_data(dataset_path, N, m; dense=true)
+function fetch_data(dataset_path, m, n; dense=true)
 
     # Unzip the dataset if needed
     if endswith(dataset_path, ".bz2")
@@ -123,8 +131,8 @@ function fetch_data(dataset_path, N, m; dense=true)
         dataset_path = unzipped_dataset_path
     end
 
-    A = dense ? zeros(N, m) : spzeros(N, m)
-    y = Vector{Float64}(undef, N)
+    A = dense ? zeros(m, n) : spzeros(m, n)
+    y = Vector{Float64}(undef, m)
     idx_start = 1
     open(dataset_path, "r+") do file
         lines = readlines(file)
@@ -152,29 +160,23 @@ end
 
 # get derivate functions for the for the logistic regression problem
 function get_derivative_fns_splog(A::Array{Float64,2}, y::VectorOrBitVector{<:IntOrFloat})
-    n = size(A, 1)
+    m = size(A, 1)
     S(x::Vector{Float64}) = exp.(-y .* (A*x))
     function grad_fx(x::Vector{Float64})
         Sx = S(x)
-        return -A' * (y .* (Sx ./ (1 .+ Sx))) / n
+        return -A' * (y .* (Sx ./ (1 .+ Sx))) / m
     end
     function hess_fx(x::Vector{Float64})
         Sx = 1 ./ (1 .+ S(x))
         W = Diagonal(Sx .* (1 .- Sx))
         hess = A' * W * A
-        return hess / n
+        return hess / m
     end
-    # function hess_fx(x)
-    #     Sx = S(x)
-    #     h = 1/n * ((A .^ 2)' * (y.^2 .* (Sx ./ (1 .+ Sx))) - (A.^2)' * (y.^2 .* (Sx.^2 ./ (1 .+ Sx) .^ 2)))
-    #     return Diagonal(h)
-    # end
     function jac_yx(ŷ::Vector{Float64})
         return vec(ŷ .* (1.0 .- ŷ)) .* A
-        # return Diagonal(ŷ .* (1.0 .- ŷ))' * A
     end
-    grad_fy(y_hat::Array{Float64}) = (-y ./ y_hat .+ (1 .- y) ./ (1 .- y_hat))/n
-    hess_fy(y_hat::Array{Float64}) = Diagonal((y ./ y_hat.^2 + (1 .- y) ./ (1 .- y_hat).^2)/n)
+    grad_fy(y_hat::Array{Float64}) = (-y ./ y_hat .+ (1 .- y) ./ (1 .- y_hat))/m
+    hess_fy(y_hat::Array{Float64}) = Diagonal((y ./ y_hat.^2 + (1 .- y) ./ (1 .- y_hat).^2)/m)
     ## or return the vector:
     # hess_fy(y_hat) = (y ./ y_hat.^2 .+ (1 .- y) ./ (1 .- y_hat).^2)./n
     

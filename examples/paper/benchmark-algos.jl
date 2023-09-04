@@ -2,6 +2,8 @@ using Dates
 using ProximalOperators
 using ProximalAlgorithms
 
+import Base.show
+
 
 struct BMSolution{A, O, R, R2, T, K, M}
     x::A
@@ -23,6 +25,9 @@ struct BMSolutionPlus{A, O, R, R2, T, K, D, M}
     metrics::D
     model::M
 end
+
+show(io::IO, s::BMSolution) = show(io, "")
+show(io::IO, s::BMSolutionPlus) = show(io, "")
 
 Base.@kwdef mutable struct BMPANOC
     name::String = "panoc"
@@ -50,7 +55,7 @@ end
 
 Base.@kwdef mutable struct BMFastProxGrad
     name::String = "f-prox-grad"
-    label::String = "Fast Proximal-Grad"
+    label::String = "Fast Prox-Grad"
 end
 function get_iter_states(method::BMFastProxGrad, x0, f, g, Lf)
     if Lf === nothing
@@ -62,7 +67,7 @@ end
 
 function iterate_bmark(model, iter_states, reg_name; x_tol=1e-10, f_tol=1e-10, extra_metrics=false)
     if extra_metrics
-        deconv_metrics = ["snr", "psnr", "mse", "re", "se", "sparsity_level"]
+        deconv_metrics = ["psnr", "mse", "re", "se", "sparsity_level"]
         metrics = Dict(metric=>[] for metric in deconv_metrics)
     end
     objs = []
@@ -81,7 +86,7 @@ function iterate_bmark(model, iter_states, reg_name; x_tol=1e-10, f_tol=1e-10, e
         obj = model.f(x) + get_reg(model, x, reg_name)
         f_rel_error = max((norm(obj - obj_star))/norm(obj_star), f_tol)
         push!(times, Δtime)
-        println("Iter $n_iter \t Loss: $obj \t Time: $Δtime")
+        println("Iter $n_iter \t Loss: $obj \t x_rel: $rel_error \t Time: $Δtime")
         flush(stdout)
         push!(objs, obj)
         push!(rel_errors, rel_error)
@@ -89,7 +94,6 @@ function iterate_bmark(model, iter_states, reg_name; x_tol=1e-10, f_tol=1e-10, e
         
         # if we are interested in metrics related to a sparse deconvolution problem
         if extra_metrics
-            push!(metrics["snr"], snr_metric(model.x, x))
             push!(metrics["psnr"], psnr_metric(model.x, x))
             push!(metrics["mse"], mean_square_error(model.x, x))
             push!(metrics["re"], recon_error(model.x, x))

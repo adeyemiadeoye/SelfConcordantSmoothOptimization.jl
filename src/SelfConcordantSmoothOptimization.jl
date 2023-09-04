@@ -5,11 +5,8 @@ export Solution
 export SolutionPlus
 export iterate!
 export NoSmooth
-export PHuberSmootherL1L2, PHuberSmootherIndBox
-export BurgSmootherL1, BurgSmootherL2
-export ExponentialSmootherL1, ExponentialSmootherL2, ExponentialSmootherIndBox
-export LogisticSmootherL1
-export BoShSmootherL1
+export PHuberSmootherL1L2, PHuberSmootherFL, PHuberSmootherGL, PHuberSmootherIndBox
+export OsBaSmootherL1, OsBaSmootherGL
 export get_reg
 
 using LinearAlgebra
@@ -20,7 +17,7 @@ import Base.show
 
 include("problems.jl")
 include("prox-operators.jl")
-include("alg-utils.jl")
+include("utils/alg-utils.jl")
 
 abstract type ProximalMethod end
 
@@ -49,14 +46,16 @@ show(io::IO, s::Solution) = show(io, "")
 show(io::IO, s::SolutionPlus) = show(io, "")
 show(io::IO, p::Problem) = show(io, "")
 
-function iter_step!(method::ProximalMethod, reg_name, model, hμ, As, x, x_prev, ys, iter)
-    return Vector{Float64}(step!(method, reg_name, model, hμ, As, x, x_prev, ys, iter))
+function iter_step!(method::ProximalMethod, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
+    return Vector{Float64}(step!(method, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter))
 end
 
 # for each implemented algorithm, add the name field here
+# TODO automate this in an efficient way
 implemented_algs = ["prox-newtonscore", "prox-ggnscore", "prox-bfgsscore"]
 function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batch_size=nothing, max_iter=1000, x_tol=1e-10, f_tol=1e-10, extra_metrics=false, verbose=1)
-    N = size(model.y,1)
+    m = size(model.y,1)
+    n = size(model.x,1)
     if method.name in implemented_algs
         if α !== nothing
             model.L = 1/α
@@ -65,14 +64,14 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
             @info "Neither L nor α is set for the problem... Now fixing α = 0.5..."
         end
     end
-    if batch_size !== nothing && batch_size < N
+    if batch_size !== nothing && batch_size < m
         data = batch_data(model)
         minibatch_mode = true
     else
         minibatch_mode = false
     end
     if extra_metrics
-        deconv_metrics = ["snr", "psnr", "mse", "re", "se", "sparsity_level"]
+        deconv_metrics = ["psnr", "mse", "re", "se", "sparsity_level"]
         metrics = Dict(metric=>[] for metric in deconv_metrics)
     end
     objs = []
@@ -96,11 +95,19 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
             As, ys = model.A, model.y
         end
         obj = model.f(x) + get_reg(model, x, reg_name)
-        rel_error = max(norm(x - x_star) / max.(norm(x_star),1), x_tol)
+
+        if reg_name == "gl"# && model.L !==nothing
+            Cmat = model.P.Cmat
+            rel_error = mean_square_error(x_star, x)
+        else
+            Cmat = I
+            rel_error = max(norm(x - x_star) / max.(norm(x_star),1), x_tol)
+        end
+        
         f_rel_error = max((norm(obj - obj_star))/norm(obj_star), f_tol)
         push!(times, Δtime)
         if verbose > 1
-            println("Iter $iter \t Loss: $obj \t Time: $Δtime")
+            println("Iter $iter \t Loss: $obj \t x_rel: $rel_error \t Time: $Δtime")
             flush(stdout)
         end
         push!(objs, obj)
@@ -110,7 +117,6 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
         # if we are interested in metrics related to some a sparse deconvolution problem
         # TODO may remove later
         if extra_metrics
-            push!(metrics["snr"], snr_metric(model.x, x))
             push!(metrics["psnr"], psnr_metric(model.x, x))
             push!(metrics["mse"], mean_square_error(model.x, x))
             push!(metrics["re"], recon_error(model.x, x))
@@ -118,7 +124,7 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
             push!(metrics["sparsity_level"], sparsity_level(x))
         end
 
-        x_new = iter_step!(method, reg_name, model, hμ, As, x, x_prev, ys, iter)
+        x_new = iter_step!(method, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
         if norm(x_new - x) < x_tol*max.(norm(x), 1) || f_rel_error ≤ f_tol
             break
         end
@@ -142,12 +148,9 @@ include("algorithms/extras/OWLQN.jl")
 
 include("smoothing-functions/smoothing.jl")
 include("smoothing-functions/phuber-smooth.jl")
-include("smoothing-functions/boltzmann-shannon-smooth.jl")
-include("smoothing-functions/burg-smooth.jl")
-include("smoothing-functions/exponential-smooth.jl")
-include("smoothing-functions/logistic-smooth.jl")
+include("smoothing-functions/ostrovskii-bach-smooth.jl")
 
 
-export snr_metric, mean_square_error, psnr_metric, recon_error, sparsity_level, support_error
+export mean_square_error, psnr_metric, recon_error, sparsity_level, support_error
 
 end

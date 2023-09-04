@@ -1,13 +1,16 @@
 using SparseArrays, DSP
 
+using Random
+using Distributions
 function rr()
     rng = MersenneTwister(1234);
     return rng
 end
 
 
-# SPARSE DECONVOLUTION PROBLEMS with L1 reg
-function SpDeconv(model_name::String, N::Integer, λ::Float64)
+# SPARSE DECONVOLUTION PROBLEM
+
+function SpDeconv(model_name::String, N::Integer, λ)
     A, B, H, y, noise, x = init_SpDeconv_models(N)
     grad_fx, hess_fx, jac_yx, grad_fy, hess_fy = get_derivative_fns_deconv(A, B, y)
     AB = A\B
@@ -42,7 +45,7 @@ function init_SpDeconv_models(N)
     # signal
     x = zeros(N)
     x[sel] .= 1
-    x = x .* sign.(randn(rr(), N)) .* (1 .- 0.3.*rand(rr(), N))
+    x = x .* sign.(randn(rr(), N)) .* (1 .- 0.5.*rand(rr(), N))
 
     b = [1, 0.8] # Define filter
     r = 0.9

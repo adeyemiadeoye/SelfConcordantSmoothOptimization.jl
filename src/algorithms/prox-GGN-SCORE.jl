@@ -9,11 +9,16 @@ Base.@kwdef mutable struct ProxGGNSCORE <: ProximalMethod
     label::String = "Prox-GGN-SCORE"
 end
 init!(method::ProxGGNSCORE, x) = method
-function step!(method::ProxGGNSCORE, reg_name, model, hμ, As, x, x_prev, ys, iter)
+function step!(method::ProxGGNSCORE, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
     obj = x -> model.f(x) + get_reg(model, x, reg_name)
-    gr = hμ.grad(x)
-    λgr = model.λ .* gr
-    Hr_diag = hμ.hess(x)
+    if length(model.λ) > 1
+        λ = model.λ[1]
+    else
+        λ = model.λ
+    end
+    gr = hμ.grad(Cmat,x)
+    λgr = λ .* gr
+    Hr_diag = hμ.hess(Cmat,x)
     if all(x->x!==nothing,(model.jac_yx, model.grad_fy, model.hess_fy))
         ŷ = model.out_fn(As, x)
         J = model.jac_yx(ŷ)
@@ -37,7 +42,7 @@ function step!(method::ProxGGNSCORE, reg_name, model, hμ, As, x, x_prev, ys, it
     Hdiag_inv = 1 ./ Hr_diag
     H_inv = Diagonal(Hdiag_inv)
 
-    d = ggn_score_step(J, Q, gr, Hr_diag, H_inv, residual, model.λ, size(ys,2))
+    d = ggn_score_step(J, Q, [gr], Hr_diag, H_inv, residual, λ, size(ys,2))
 
     if method.ss_type == 1 && model.L !==nothing
         step_size = min(1/model.L,1.0)
@@ -47,7 +52,7 @@ function step!(method::ProxGGNSCORE, reg_name, model, hμ, As, x, x_prev, ys, it
         if iter == 1
             step_size = 1
         else
-            λgr_prev = model.λ .* hμ.grad(x_prev)
+            λgr_prev = λ .* hμ.grad(x_prev)
             ∇f_prev = grad_f(x_prev) + λgr_prev
             step_size = inv_BB_step(x, x_prev, ∇f, ∇f_prev) # inverse of the original BB step-size
         end
@@ -66,27 +71,29 @@ function step!(method::ProxGGNSCORE, reg_name, model, hμ, As, x, x_prev, ys, it
     # (actually satisfies it for many convex problems)
     safe_α = min(1, α)
     
-    prox_m = invoke_prox(model, reg_name, x + safe_α*d, Hdiag_inv, model.λ, step_size)
+    prox_m = invoke_prox(model, reg_name, x + safe_α*d, Hdiag_inv, λ, step_size)
     x_new = prox_step(prox_m)
 
     return x_new
 end
 
-function ggn_score_step(J::Matrix{Float64}, Q::Union{Matrix{Float64}, Diagonal{Float64, Vector{Float64}}}, gr::Vector{Float64}, Hr_diag::Vector{Float64}, H_inv::Diagonal{Float64,Vector{Float64}}, residual::Array{Float64,1}, λ::Float64, ydm2::Int64)
-    n = length(gr)
+function ggn_score_step(J::Matrix{Float64}, Q::Union{Matrix{Float64}, Diagonal{Float64, Vector{Float64}}}, gr::Vector{Vector{Float64}}, Hr_diag::Vector{Float64}, H_inv::Diagonal{Float64,Vector{Float64}}, residual::Array{Float64,1}, λ::IntOrFloat, ydm2::Int64)
+    n = length(gr[1])
+    # we allow the possibility to have more than one Jacobian "concatenations" for problems of more than one regularization functions (tip for future works)
+    ncat = length(gr)
     qdm1 = size(Q,1)
-    qdm11 = qdm1+1
-    Jt = reduce(hcat, [J', λ .* gr])
-    residual = [residual ; ones(ydm2)]
-    Q = [[Q ; zeros(qdm1)'] zeros(qdm11)]
+    qdm11 = qdm1+ncat
+    Jt = reduce(hcat, [J', λ .* hcat(gr)])
+    residual = [residual ; repeat(ones(ydm2),ncat)]
+    Q = [[Q ; repeat(zeros(qdm1)', ncat)] repeat(zeros(qdm11)',ncat)']
     if qdm11 ≤ n
-        A = Q * Jt' * H_inv * Jt
-        B = lu(λ.*I + A) \ residual
+        A = Q * (Jt' * H_inv) * Jt
+        B = qr(sum(ones(ncat))I + A) \ residual
         d = H_inv * Jt * B
     else
         JQJ = (Jt * Q * Jt') + λ.*Diagonal(Hr_diag)
         Je = Jt * residual
-        d = lu(JQJ) \ Je
+        d = qr(JQJ) \ Je
     end
     
     return -d

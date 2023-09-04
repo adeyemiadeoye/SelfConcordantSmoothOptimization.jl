@@ -83,7 +83,7 @@ function ggn_score_step(J::Matrix{Float64}, Q::Union{Matrix{Float64}, Diagonal{F
     ncat = length(gr)
     qdm1 = size(Q,1)
     qdm11 = qdm1+ncat
-    Jt = reduce(hcat, [J', λ .* hcat(gr)])
+    Jt = reduce(hcat, [J', λ .* reduce(hcat,gr)])
     residual = [residual ; repeat(ones(ydm2),ncat)]
     Q = [[Q ; repeat(zeros(qdm1)', ncat)] repeat(zeros(qdm11)',ncat)']
     if qdm11 ≤ n

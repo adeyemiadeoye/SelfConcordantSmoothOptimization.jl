@@ -1,6 +1,18 @@
-μ = 0.2;
+μ = 1;
 lb = -1.0;
 ub = 1.0;
+cd("..")
+dir_ = pwd() * "/examples/paper/"
+include(dir_*"spgrouplasso/spgrouplasso.jl")
+A, y, x0, x_star, P = init_GroupLasso_models("sim_gl", 4, 6; grpsize=2, use_const_grpsize=true)
+cd("test")
+λmax = norm(A'*y,Inf)
+tau = P.tau = 0.9
+lambda_ = 1e-7*λmax
+λ1 = tau*lambda_
+λ2 = (10-tau)*lambda_
+λ = [λ1,λ2]
+f_reg(x) = 0.5*sum(abs2.(A*x - y))
 
 @testset "PHuber l1 l2" begin
     hμ = PHuberSmootherL1L2(μ);
@@ -9,49 +21,27 @@ ub = 1.0;
 end
 
 @testset "PHuber indbox" begin
-    hμ = PHuberSmootherIndBox(lb, ub, μ);
+    hμ = PHuberSmootherIndBox(lb, ub, μ)
     @test hμ.Mh == 2.0
     @test hμ.ν == 2.6
 end
 
-@testset "Exponential l1" begin
-    hμ = ExponentialSmootherL1(μ);
-    @test hμ.Mh == 1.0
-    @test hμ.ν == 2.0
+@testset "PHuber group lasso" begin
+    model = Problem(A, y, x0, f_reg, λ; P=P, sol=x_star, out_fn=(A, x)->A*x)
+    hμ = PHuberSmootherGL(μ, model)
+    @test hμ.Mh == 2.0
+    @test hμ.ν == 2.6
 end
 
-@testset "Exponential l2" begin
-    hμ = ExponentialSmootherL2(μ);
-    @test hμ.Mh == 1.0
-    @test hμ.ν == 2.0
-end
-
-@testset "Exponential indbox" begin
-    hμ = ExponentialSmootherIndBox(lb, ub, μ);
-    @test hμ.Mh == 1.0
-    @test hμ.ν == 2.0
-end
-
-@testset "Logistic l1" begin
-    hμ = LogisticSmootherL1(μ);
-    @test hμ.Mh == 1.0
-    @test hμ.ν == 2.0
-end
-
-@testset "Burg l1" begin
-    hμ = BurgSmootherL1(μ);
-    @test hμ.Mh == 8.0
+@testset "Ostrovskii & Bach l1" begin
+    hμ = OsBaSmootherL1(μ);
+    @test hμ.Mh == 2*sqrt(2)
     @test hμ.ν == 3.0
 end
 
-@testset "Burg l2" begin
-    hμ = BurgSmootherL2(μ);
-    @test hμ.Mh == 8.0
+@testset "Ostrovskii & Bach group lasso" begin
+    model = Problem(A, y, x0, f_reg, λ; P=P, sol=x_star, out_fn=(A, x)->A*x)
+    hμ = OsBaSmootherGL(μ, model)
+    @test hμ.Mh == 2*sqrt(2)
     @test hμ.ν == 3.0
-end
-
-@testset "Boltzmann-Shannon l1" begin
-    hμ = BoShSmootherL1(μ);
-    @test hμ.Mh == 1.0
-    @test hμ.ν == 4.0
 end

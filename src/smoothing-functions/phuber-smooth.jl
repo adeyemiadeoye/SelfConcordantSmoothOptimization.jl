@@ -32,8 +32,8 @@ mutable struct PHuberSmootherIndBox <: Smoother
 end
 function PHuberSmootherIndBox(lb::VectorOrFloat, ub::VectorOrFloat, mu::IntOrFloat)
     val = x -> pseudo_huber_indbox(x;μ=mu,lb=lb,ub=ub)
-    grad = x -> huber_grad_indbox(x;μ=mu,lb=lb,ub=ub)
-    hess = x -> huber_hess_indbox(x;μ=mu,lb=lb,ub=ub)
+    grad = (Cmat,x) -> huber_grad_indbox(x;μ=mu,lb=lb,ub=ub)
+    hess = (Cmat,x) -> huber_hess_indbox(x;μ=mu,lb=lb,ub=ub)
     
     return PHuberSmootherIndBox(mu, huber_smooth_Mh, huber_smooth_ν, val, grad, hess)
 end

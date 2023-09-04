@@ -1,4 +1,4 @@
-using SparseArrays, LinearAlgebra, NPZ
+using SparseArrays, LinearAlgebra#, NPZ
 using SelfConcordantSmoothOptimization
 
 using Random
@@ -12,7 +12,7 @@ Random.seed!(1234)
 
 include("get_group.jl")
 
-using LIBSVMdata, JLD2, FileIO
+# using LIBSVMdata, JLD2, FileIO
 
 glproblems = vcat(["sim_gl"])
 

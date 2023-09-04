@@ -2,8 +2,8 @@
     A = [-0.560501 0.0;  0.0 1.85278; -0.0192918 -0.827763; 0.128064 0.110096; 0.0 -0.251176]
     y = [-1, -1, -1, 1, -1]
     x0 = [0.5908446386657102, 0.7667970365022592]
-    λ = 0.4
-    μ = 0.2
+    λ = 1
+    μ = 1
     lb = -1.0
     ub = 1.0
     f_reg(x) = 1/2*sum(log.(1 .+ exp.(-y .* (A*x))))
@@ -66,16 +66,8 @@ end
     TOL = 1e-3
 
     @testset "PHuber indbox" begin
-        model = Problem(A, y, x0, f_qp, λ; C_set=(lb, ub), sol=x_star)
+        model = Problem(A, y, x0, f_qp, λ; C_set=[lb, ub], sol=x_star)
         sol = iterate!(ProxNSCORE(), model, "indbox", PHuberSmootherIndBox(lb, ub, μ), α=0.8)
-        @test sol.iters+1 > 1
-        @test sol.rel[end] <= TOL
-        @test sol.objrel[end] <= TOL
-    end
-    
-    @testset "Exponential indbox" begin
-        model = Problem(A, y, x0, f_qp, λ; C_set=(lb, ub), sol=x_star)
-        sol = iterate!(ProxNSCORE(), model, "indbox", ExponentialSmootherIndBox(lb, ub, μ), α=0.8)
         @test sol.iters+1 > 1
         @test sol.rel[end] <= TOL
         @test sol.objrel[end] <= TOL

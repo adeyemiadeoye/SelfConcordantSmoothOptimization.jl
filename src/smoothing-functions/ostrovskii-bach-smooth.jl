@@ -1,4 +1,4 @@
-# pseudo-Huber smoothing function
+# Ostrovskii & Bach smoothing function
 
 const osba_smooth_Mh = 2*sqrt(2)
 const osba_smooth_ν = 3.0

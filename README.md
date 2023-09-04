@@ -138,7 +138,7 @@ As the package name and description imply, the implemented algorithms use a gene
 |------------------	|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------	|-----------------------------------------------------------------------------------------------------	|
 | `"l1"`           	| <li>`PHuberSmootherL1L2(μ)`</li> <li>`OsBaSmootherL1L2(μ)`</li>	| $\mathrm{\mu}>0$                                                                                             	|
 | `"l2"`           	| <li>`PHuberSmootherL1L2(μ)`</li> <li>`OsBaSmootherL1L2(μ)`</li>                                                                       	| $\mathrm{\mu}>0$                                                                                             	|
-| `"gl"`       	| <li>`PHuberSmootherGL(μ, model)`</li>                                                                          	| $\mathrm{\mu}>0$ 	|
+| `"gl"`       	| <li>`PHuberSmootherGL(μ, model)`</li>                                                                          	| For sparse group lasso regularizer <br> $\mathrm{\mu}>0$ 	|
 | `"indbox"`       	| <li>`PHuberSmootherIndBox(lb,ub,μ)`</li>                                                                          	| `lb`: lower bound in the box constraints <br> `ub`: upper bound in the box constraints <br> $\mathrm{\mu}>0$ 	|
 
 - `PHuberSmootherL1L2`, `PHuberSmootherGL`, `PHuberSmootherIndBox` are highly recommended.

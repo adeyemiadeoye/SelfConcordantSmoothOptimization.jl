@@ -8,14 +8,14 @@ using NPZ
 ##### RUN INDIVIDUAL EXAMPLE #####
 # adjust the parameters according to paper
 
-@time model, _, sol = solve!("sim_log", "prox-ggnscore"; m=100, n=1000, λ=1, μ=1, max_iter=2000, reg_name="l1", ss_type=1, verbose=2, α=1);
+## sparse logistic regression
+# @time model, _, sol = solve!("sim_log", "prox-ggnscore"; m=100, n=1000, λ=1, μ=1, max_iter=2000, reg_name="l1", ss_type=1, verbose=2, α=1);
 
+## sparse deconvolution
 # @time model, _, sol = solve!("deconv", "prox-grad"; m=1024, n=200, λ=1e-3, μ=5e-2, max_iter=5000, reg_name="l1", ss_type=1, x_tol=1e-6, f_tol=1e-6, verbose=2, α=1);
 
-# @time model, _, sol = solve!("boxqp", "prox-newtonscore"; m=200, λ=1.0e-4, μ=0.6, reg_name="indbox", max_iter=10000, x_tol=1e-10, f_tol=1e-10, α=0.8, ss_type=1, lb=-1.0, ub=1.0, verbose=0);
 
-# @time model, _, sol = solve!("fusedlasso", "prox-ggnscore"; m=100, n=1000, λ=(1e-7, 1e-3), μ=5.0, max_iter=20000, reg_name="fl", ss_type=1, verbose=2, x_tol=1e-8);
-
+## sparse group lasso
 # m, n = 500, 2000
 # problem = "sim_gl"
 # method = "prox-ggnscore"

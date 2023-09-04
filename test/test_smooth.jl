@@ -34,7 +34,7 @@ end
 end
 
 @testset "Ostrovskii & Bach l1" begin
-    hμ = OsBaSmootherL1(μ);
+    hμ = OsBaSmootherL1L2(μ);
     @test hμ.Mh == 2*sqrt(2)
     @test hμ.ν == 3.0
 end

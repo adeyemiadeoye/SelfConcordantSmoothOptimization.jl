@@ -33,7 +33,7 @@ using Random, Distributions, SparseArrays
 # Generate a random data
 Random.seed!(1234)
 n, m = 100, 50;
-A = sprandn(n, m, 0.12);
+A = Matrix(sprandn(n, m, 0.01));
 y_prob = 1 ./ (1 .+ exp.(-A * zeros(m)));
 y = rand.(Bernoulli.(y_prob));
 unique_y = unique(y); 
@@ -117,34 +117,38 @@ sol_n.x
 # And for ProxGGNSCORE (does not require hess_fx):
 model_ggn = Problem(A, y, x0, f, λ; out_fn=Mfunc, grad_fx=grad_fx, jac_yx=jac_yx, grad_fy=grad_fy, hess_fy=hess_fy);
 method_ggn = ProxGGNSCORE();
-sol_ggn = iterate!(method_ggn, model_gnn, reg_name, hμ; max_iter=100, x_tol=1e-6, f_tol=1e-6);
+sol_ggn = iterate!(method_ggn, model_ggn, reg_name, hμ; max_iter=100, x_tol=1e-6, f_tol=1e-6);
 sol_ggn.x
 ```
+TODO: Add a simple sparse group lasso example... (for now, see example from paper).
 
 ## Implementation details and recommendations
 Below is a summary of functions $\mathrm{f}$ supported by the algorithms implemented in the package:
 
 | Algorithm      	| Supported $\mathrm{f}$                                                                                                                                                                                                                                 |
 |----------------	|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------	|
-| `ProxNSCORE`   	| <li>Any twice continuously differentiable convex function.</li>                                                                                                                                                                                        		|
-| `ProxGGNSCORE` 	| <li>Any function that can be expressed in the form $f(x) =  \sum\limits_{i=1}^{m}\ell(y_i,\hat{y}_i;x)$ where $\ell$ is a loss function that measures a data-misfit.</li> <li>Requires a model $\mathcal{M}(A,x)$ that computes the predictions $\hat{y}_i$.</li> 		|
-| `ProxQNSCORE`  	| <li>Any twice continuously differentiable convex function.</li>                                                                                                                                                                                        		|
+| `ProxNSCORE`   	| <li>Any twice continuously differentiable function.</li>                                                                                                                                                                                        		|
+| `ProxGGNSCORE` 	| <li>Any twice continuously differentiable function that can be expressed in the form $f(x) =  \sum\limits_{i=1}^{m}\ell(y_i,\hat{y}_i)$ where $\ell$ is a loss function that measures a data-misfit.</li> <li>Requires a model $\mathcal{M}(A,x)$ that computes the predictions $\hat{y}_i$.</li> 		|
+| `ProxQNSCORE`  	| <li>Any twice continuously differentiable function (currently not recommended).</li> <li>Currently not recommended.</li>                                                                                                                                                                                       		|
 
 
 As the package name and description imply, the implemented algorithms use a generalized self-concordant smooth approximation $\mathrm{g_s}$ of $\mathrm{g}$ in their procedures. The algorithms do this for specific regularization functions that are specified by `reg_name` that takes a string value in the `iterate!` function. We summarize below currently implemented regularization functions, as well as the corresponding smoothing functions $\mathrm{g_s}$.
 
 | `reg_name` value 	| Implemented $\mathrm{g_s}$ function(s)                                                                                                                                              	| Remark(s)                                                                                           		|
 |------------------	|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------	|-----------------------------------------------------------------------------------------------------	|
-| `"l1"`           	| <li>`PHuberSmootherL1L2(μ)`</li> <li>`ExponentialSmootherL1(μ)`</li> <li>`LogisticSmootherL1(μ)`</li> <li>`BoShSmootherL1(μ)`</li> <li>`BurgSmootherL1(μ)`</li> 	| $\mathrm{\mu}>0$                                                                                             	|
-| `"l2"`           	| <li>`PHuberSmootherL1L2(μ)`</li> <li>`ExponentialSmootherL2(μ)`</li> <li>`BurgSmootherL2(μ)`</li>                                                                       	| $\mathrm{\mu}>0$                                                                                             	|
-| `"indbox"`       	| <li>`PHuberSmootherIndBox(lb,ub,μ)`</li> <li>`ExponentialSmootherIndBox(lb,ub,μ)`</li>                                                                          	| `lb`: lower bound in the box constraints <br> `ub`: upper bound in the box constraints <br> $\mathrm{\mu}>0$ 	|
+| `"l1"`           	| <li>`PHuberSmootherL1L2(μ)`</li> <li>`OsBaSmootherL1L2(μ)`</li>	| $\mathrm{\mu}>0$                                                                                             	|
+| `"l2"`           	| <li>`PHuberSmootherL1L2(μ)`</li> <li>`OsBaSmootherL1L2(μ)`</li>                                                                       	| $\mathrm{\mu}>0$                                                                                             	|
+| `"gl"`       	| <li>`PHuberSmootherGL(μ, model)`</li>                                                                          	| $\mathrm{\mu}>0$ 	|
+| `"indbox"`       	| <li>`PHuberSmootherIndBox(lb,ub,μ)`</li>                                                                          	| `lb`: lower bound in the box constraints <br> `ub`: upper bound in the box constraints <br> $\mathrm{\mu}>0$ 	|
 
-- We highly recommend to use `PHuberSmootherL1L2` with `"l1"` and `"l2"`, as it provides smooth approximations that satisfy the self-concordant smoothing conditions for the (scaled) $\ell_1$- and $\ell_2$-norms.
+- `PHuberSmootherL1L2`, `PHuberSmootherGL`, `PHuberSmootherIndBox` are highly recommended.
 
 For more details and insights on the approach implemented in this package, please see the associated paper in [Citing](#citing) below.
 
 ## Citing
 If you use `SelfConcordantSmoothOptimization.jl` in your work, particularly the algorithms listed above, we kindly request that you cite the following paper:
+
+"Self-concordant Smoothing for Convex Composite Optimization" A.D. Adeoye, A. Bemporad, arXiv 2023
 
 ## Contributing
 Please use the [Github issue tracker](https://github.com/adeyemiadeoye/SelfConcordantSmoothOptimization.jl/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) for reporting any issues. All types of issues are welcome including bug reports, feature requests, implementation for a specific research problem, etc.

@@ -77,7 +77,7 @@ function step!(method::ProxGGNSCORE, reg_name, model, hμ, As, x, x_prev, ys, Cm
     return x_new
 end
 
-function ggn_score_step(J::Matrix{Float64}, Q::Union{Matrix{Float64}, Diagonal{Float64, Vector{Float64}}}, gr::Vector{Vector{Float64}}, Hr_diag::Vector{Float64}, H_inv::Diagonal{Float64,Vector{Float64}}, residual::Array{Float64,1}, λ::IntOrFloat, ydm2::Int64)
+function ggn_score_step(J::Union{SparseMatrixCSC{Float64, Int64},Matrix{Float64}}, Q::Union{Matrix{Float64}, Diagonal{Float64, Vector{Float64}}}, gr::Vector{Vector{Float64}}, Hr_diag::Vector{Float64}, H_inv::Diagonal{Float64,Vector{Float64}}, residual::Array{Float64,1}, λ::IntOrFloat, ydm2::Int64)
     n = length(gr[1])
     # we allow the possibility to have more than one Jacobian "concatenations" for problems of more than one regularization functions (tip for future works)
     ncat = length(gr)

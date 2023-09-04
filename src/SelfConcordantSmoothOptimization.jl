@@ -6,7 +6,7 @@ export SolutionPlus
 export iterate!
 export NoSmooth
 export PHuberSmootherL1L2, PHuberSmootherFL, PHuberSmootherGL, PHuberSmootherIndBox
-export OsBaSmootherL1, OsBaSmootherGL
+export OsBaSmootherL1L2, OsBaSmootherGL
 export get_reg
 
 using LinearAlgebra

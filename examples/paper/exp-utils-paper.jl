@@ -189,7 +189,7 @@ function plot_reg(;ex="1")
     if ex == "1"
         ghμ = (μ) -> PHuberSmootherL1L2(μ).val
     else
-        ghμ = (μ) -> OsBaSmootherL1(μ).val
+        ghμ = (μ) -> OsBaSmootherL1L2(μ).val
     end
     p = plot([g ghμ(0.2) ghμ(0.5) ghμ(1.0)], label=["\$g\$" "\$g □ h_{0.2}\$" "\$g □ h_{0.5}\$" "\$g □ h_{1.0}\$"], legend=:top)
 

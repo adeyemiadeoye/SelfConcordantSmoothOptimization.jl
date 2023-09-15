@@ -17,9 +17,10 @@ minimize f(x) + g(x)
 where $\mathrm{f}\colon \mathbb{R}^n \to \mathbb{R}$ is smooth and convex, and $\mathrm{g}\colon \mathbb{R}^n \to \mathbb{R}$, which may be nonsmooth, is proper, closed and convex. The smooth part $\mathrm{f}$ defines the problem's objective function, such as quantifying a data-misfit, while the nonsmooth part $\mathrm{g}$ imposes certain properties, such as sparsity, on the decision variable $\mathrm{x}$. Please see [Implementation details and recommendations](#implementation-details-and-recommendations) for functions that are currently supported for each implemented algorithm.
 
 ## Installation
-For now (until the package is registered), the package can be added via Julia's `REPL` with
+Install the package via Julia's `REPL` with
 ```
-] add https://github.com/adeyemiadeoye/SelfConcordantSmoothOptimization.jl
+julia> ]
+pkg> add SelfConcordantSmoothOptimization
 ```
 
 ## Usage example
@@ -147,6 +148,14 @@ For more details and insights on the approach implemented in this package, pleas
 
 ## Citing
 If you use `SelfConcordantSmoothOptimization.jl` in your work, particularly the algorithms listed above, we kindly request that you cite the following paper:
+```
+@article{adeoye2023self,
+  title={Self-concordant Smoothing for Convex Composite Optimization},
+  author={Adeoye, Adeyemi D and Bemporad, Alberto},
+  journal={arXiv preprint arXiv:2309.01781},
+  year={2023}
+}
+```
 
 "Self-concordant Smoothing for Convex Composite Optimization" A.D. Adeoye, A. Bemporad, arXiv 2023
 

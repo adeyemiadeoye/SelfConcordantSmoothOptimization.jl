@@ -157,7 +157,5 @@ If you use `SelfConcordantSmoothOptimization.jl` in your work, particularly the 
 }
 ```
 
-"Self-concordant Smoothing for Convex Composite Optimization" A.D. Adeoye, A. Bemporad, arXiv 2023
-
 ## Contributing
 Please use the [Github issue tracker](https://github.com/adeyemiadeoye/SelfConcordantSmoothOptimization.jl/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) for reporting any issues. All types of issues are welcome including bug reports, feature requests, implementation for a specific research problem, etc.

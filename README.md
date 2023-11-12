@@ -142,7 +142,7 @@ As the package name and description imply, the implemented algorithms use a gene
 | `"gl"`       	| <li>`PHuberSmootherGL(μ, model)`</li>                                                                          	| For sparse group lasso regularizer <br> $\mathrm{\mu}>0$ 	|
 | `"indbox"`       	| <li>`PHuberSmootherIndBox(lb,ub,μ)`</li>                                                                          	| `lb`: lower bound in the box constraints <br> `ub`: upper bound in the box constraints <br> $\mathrm{\mu}>0$ 	|
 
-- `PHuberSmootherL1L2`, `PHuberSmootherGL`, `PHuberSmootherIndBox` are highly recommended.
+[!NOTE]<br>`PHuberSmootherL1L2`, `PHuberSmootherGL`, `PHuberSmootherIndBox` are highly recommended.
 
 For more details and insights on the approach implemented in this package, please see the associated paper in [Citing](#citing) below.
 

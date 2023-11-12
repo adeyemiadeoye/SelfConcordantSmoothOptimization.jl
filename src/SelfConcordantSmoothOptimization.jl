@@ -69,6 +69,7 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
         minibatch_mode = true
     else
         minibatch_mode = false
+        batch_size = m
     end
     if extra_metrics
         deconv_metrics = ["psnr", "mse", "re", "se", "sparsity_level"]
@@ -88,12 +89,6 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
     for iter in 1:max_iter
         Δtime = (now() - t0).value/1000
 
-        # TODO mini-batch mode not fully implemented yet
-        if minibatch_mode
-            As, ys = sample_batch(model, data, batch_size)
-        else
-            As, ys = model.A, model.y
-        end
         obj = model.f(x) + get_reg(model, x, reg_name)
 
         if reg_name == "gl"# && model.L !==nothing
@@ -115,7 +110,6 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
         push!(f_rel_errors, f_rel_error)
 
         # if we are interested in metrics related to some a sparse deconvolution problem
-        # TODO may remove later
         if extra_metrics
             push!(metrics["psnr"], psnr_metric(model.x, x))
             push!(metrics["mse"], mean_square_error(model.x, x))
@@ -124,12 +118,25 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
             push!(metrics["sparsity_level"], sparsity_level(x))
         end
 
-        x_new = iter_step!(method, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
-        if norm(x_new - x) < x_tol*max.(norm(x), 1) || f_rel_error ≤ f_tol
+        for i in 1:batch_size:m
+            if minibatch_mode
+                As, ys = sample_batch(data, batch_size)
+            else
+                As, ys = model.A, model.y
+            end
+
+            x_new = iter_step!(method, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
+            if norm(x_new - x) < x_tol*max.(norm(x), 1) || f_rel_error ≤ f_tol
+                break
+            end
+            x_prev = deepcopy(x)
+            x = x_new
+        end
+
+        if norm(x - x_prev) < x_tol*max.(norm(x_prev), 1) || f_rel_error ≤ f_tol
             break
         end
-        x_prev = deepcopy(x)
-        x = x_new
+
         iters += 1
     end
     if extra_metrics
@@ -137,6 +144,20 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
     else
         return Solution(x, objs, rel_errors, f_rel_errors, times, iters, model)
     end
+end
+
+function batch_data(model::ProxModel)
+    m = size(model.y, 1)
+    return [(model.A[i,:],model.y[i]) for i in 1:m]
+end
+
+function sample_batch(data, mb)
+    # mb : batch_size
+    s = sample(data,mb,replace=false,ordered=true)
+    As = Array(hcat(map(x->x[1], s)...)')
+    ys = Array(hcat(map(x->x[2], s)...)')
+
+    return As, ys
 end
 
 include("algorithms/prox-N-SCORE.jl")

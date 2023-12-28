@@ -1,8 +1,8 @@
 # SelfConcordantSmoothOptimization.jl
 
 <p align="center">
-    <a style="text-decoration:none !important;" href="https://arxiv.org/abs/2309.01781" alt="arXiv"><img src="https://img.shields.io/badge/paper-arXiv-red" /></a>
-    <a style="text-decoration:none !important;" href="https://opensource.org/licenses/MIT" alt="License"><img src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
+    <a style="text-decoration:none !important;" href="https://arxiv.org/abs/2309.01781" alt="arXiv" target="_blank"><img src="https://img.shields.io/badge/paper-arXiv-red" /></a>
+    <a style="text-decoration:none !important;" href="https://opensource.org/licenses/MIT" alt="License" target="_blank"><img src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
 </p>
 
 <p align="center">

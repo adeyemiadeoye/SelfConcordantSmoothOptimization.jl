@@ -5,6 +5,7 @@ export ProxNSCORE
 # A Proximal Newton method
 Base.@kwdef mutable struct ProxNSCORE <: ProximalMethod
     ss_type::Int = 1
+    use_prox::Bool = true
     name::String = "prox-newtonscore"
     label::String = "Prox-N-SCORE"
 end
@@ -19,12 +20,12 @@ function step!(method::ProxNSCORE, reg_name, model, hμ, As, x, x_prev, ys, Cmat
     λgr = λ .* gr
     Hr_diag = hμ.hess(Cmat,x)
     λHr = λ .* Diagonal(Hr_diag)
-    obj = x -> model.f(x) + get_reg(model, x, reg_name)
+    obj = x -> model.f(As, ys, x) + get_reg(model, x, reg_name)
     if all(x->x!==nothing,(model.grad_fx, model.hess_fx))
         H = model.hess_fx(x)
         grad_f = x -> model.grad_fx(x)
     else
-        f = model.f
+        f = x -> model.f(As, ys, x)
         H = hessian(f, x)
         grad_f = x -> gradient(f, x)
     end
@@ -60,9 +61,13 @@ function step!(method::ProxNSCORE, reg_name, model, hμ, As, x, x_prev, ys, Cmat
 
     # ensure αₖ satisfies the theoretical condition
     # (actually satisfies it for many convex problems)
-    safe_α = min(1, α) 
-    prox_m = invoke_prox(model, reg_name, x + safe_α*d, Hdiag_inv, λ, step_size)
-    x_new = prox_step(prox_m)
+    safe_α = min(1, α)
+    if method.use_prox
+        prox_m = invoke_prox(model, reg_name, x + safe_α*d, Hdiag_inv, λ, step_size)
+        x_new = prox_step(prox_m)
+    else
+        x_new = x + safe_α*d
+    end
 
     return x_new
 end

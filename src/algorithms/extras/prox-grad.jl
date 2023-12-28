@@ -5,6 +5,7 @@ export ProxGradient
 # Proximal gradient method
 Base.@kwdef mutable struct ProxGradient <: ProximalMethod
     ss_type::Int = 1
+    use_prox::Bool = true
     name::String = "prox-grad"
     label::String = "Prox-Grad"
 end
@@ -15,13 +16,14 @@ function step!(method::ProxGradient, reg_name, model, hμ, As, x, x_prev, ys, Cm
     else
         λ = model.λ
     end
-    λgr = λ .* hμ.grad(x)
-    Hr_diag = hμ.hess(x)
-    obj = x -> model.f(x) + get_reg(model, x, reg_name)
+    λgr = λ .* hμ.grad(Cmat,x)
+    Hr_diag = hμ.hess(Cmat,x)
+    obj = x -> model.f(As, ys, x) + get_reg(model, x, reg_name)
     if model.grad_fx !== nothing
         grad_f = x -> model.grad_fx(x)
     else
-        grad_f = x -> gradient(model.f, x)
+        f = x -> model.f(As, ys, x)
+        grad_f = x -> gradient(f, x)
     end
     ∇f = grad_f(x) + λgr
     d = -∇f
@@ -30,7 +32,7 @@ function step!(method::ProxGradient, reg_name, model, hμ, As, x, x_prev, ys, Cm
         step_size = 1/model.L
     elseif method.ss_type == 1 && model.L === nothing
         step_size = linesearch(x, d, obj, grad_f)
-    elseif method.ss_type == 2 || model.L === nothing
+    elseif method.ss_type == 2
         λgr_prev = λ .* hμ.grad(x_prev)
         ∇f_prev = grad_f(x_prev) + λgr_prev
         δ = x - x_prev
@@ -49,8 +51,12 @@ function step!(method::ProxGradient, reg_name, model, hμ, As, x, x_prev, ys, Cm
         step_size = 1/model.L
     end
 
-    prox_m = invoke_prox(model, reg_name, x + step_size*d, one.(Hr_diag), λ, step_size)
-    x_new = prox_step(prox_m)
+    if method.use_prox
+        prox_m = invoke_prox(model, reg_name, x + step_size*d, one.(Hr_diag), λ, step_size)
+        x_new = prox_step(prox_m)
+    else
+        x_new = x + step_size*d
+    end
 
     return x_new
 end

@@ -81,7 +81,8 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
     times = []
     iters = 0
     x_star = model.x
-    obj_star = model.f(x_star) + get_reg(model, x_star, reg_name)
+    f(x) = model.f(model.A, model.y, x)
+    obj_star = f(x_star) + get_reg(model, x_star, reg_name)
     x = model.x0
     x_prev = deepcopy(x)
     init!(method, x)
@@ -89,7 +90,7 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
     for iter in 1:max_iter
         Δtime = (now() - t0).value/1000
 
-        obj = model.f(x) + get_reg(model, x, reg_name)
+        obj = f(x) + get_reg(model, x, reg_name)
 
         if reg_name == "gl"# && model.L !==nothing
             Cmat = model.P.Cmat
@@ -102,7 +103,8 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
         f_rel_error = max((norm(obj - obj_star))/norm(obj_star), f_tol)
         push!(times, Δtime)
         if verbose > 1
-            println("Iter $iter \t Loss: $obj \t x_rel: $rel_error \t Time: $Δtime")
+            solve_info = "Epoch $(iter-1) \t Loss: $obj \t x_rel: $rel_error \t Time: $Δtime"
+            println(solve_info)
             flush(stdout)
         end
         push!(objs, obj)
@@ -123,6 +125,17 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
                 As, ys = sample_batch(data, batch_size)
             else
                 As, ys = model.A, model.y
+            end
+
+            if verbose > 2
+                print("[$(Int(ceil(i/batch_size)))/$(Int(ceil(m/batch_size)))] ")
+                if iter==max_iter && i==(1:batch_size:m)[end]
+                    Δtime = (now() - t0).value/1000
+                    obj = f(x) + get_reg(model, x, reg_name)
+                    solve_info = "\nEpoch $iter \t Loss: $obj \t x_rel: $rel_error \t Time: $Δtime"
+                    println(solve_info)
+                    flush(stdout)
+                end
             end
 
             x_new = iter_step!(method, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
@@ -148,7 +161,7 @@ end
 
 function batch_data(model::ProxModel)
     m = size(model.y, 1)
-    return [(model.A[i,:],model.y[i]) for i in 1:m]
+    return [(model.A[i,:],model.y[i,:]) for i in 1:m]
 end
 
 function sample_batch(data, mb)

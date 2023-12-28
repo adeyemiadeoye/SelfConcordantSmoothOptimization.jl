@@ -12,7 +12,7 @@ lambda_ = 1e-7*λmax
 λ1 = tau*lambda_
 λ2 = (10-tau)*lambda_
 λ = [λ1,λ2]
-f_reg(x) = 0.5*sum(abs2.(A*x - y))
+f_reg(A, y, x) = 0.5*sum(abs2.(A*x - y))
 
 @testset "PHuber l1 l2" begin
     hμ = PHuberSmootherL1L2(μ);

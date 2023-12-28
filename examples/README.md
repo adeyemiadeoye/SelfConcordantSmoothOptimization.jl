@@ -1,4 +1,5 @@
-The `/paper` directory currently contains codes to reproduce most of the results in the paper:
+> [!NOTE]
+> The `/paper` directory currently contains codes to reproduce most of the results in the following paper using `v0.1.0` of the package:
 
 ```
 @article{adeoye2023self,
@@ -8,3 +9,6 @@ The `/paper` directory currently contains codes to reproduce most of the results
   year={2023}
 }
 ```
+
+> [!IMPORTANT]
+> Please install `v0.1.0` to run the example codes.

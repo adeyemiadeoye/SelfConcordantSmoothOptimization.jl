@@ -3,6 +3,7 @@ using IntervalSets
 export IntegerOrNothing
 export IntOrFloat
 export VectorOrBitVector
+export VectorBitVectorOrArray2
 export VectorOrFloat
 export is_interval_set
 export bounds_sanity_check
@@ -16,6 +17,7 @@ const StringOrNothing = Union{String, Nothing}
 const FuncOrNothing = Union{Function, Nothing}
 const IntegerOrNothing = Union{Integer, Nothing}
 const VectorOrBitVector{T} = Union{BitVector, Vector{T}}
+const VectorBitVectorOrArray2{T} = Union{BitVector, Vector{T}, Matrix{T}}
 const IntOrFloat = Union{Int64, Float64}
 const VectorOrFloat = Union{Vector{T}, T} where {T<:Real}
 const IntFloatVectorOrTupleOfTwo = Union{IntOrFloat, Tuple{T, T}, Vector{T}, Vector{Vector{T}}, Nothing} where {T<:Real}
@@ -63,7 +65,7 @@ end
 
 function Problem(
             A::OperatorOrArray2,
-            y::VectorOrBitVector{<:Real},
+            y::VectorBitVectorOrArray2{<:Real},
             x0::Vector{Float64},
             f::Function,
             λ::IntFloatVectorOrTupleOfTwo;

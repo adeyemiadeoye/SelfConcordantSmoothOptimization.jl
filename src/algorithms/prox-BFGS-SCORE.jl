@@ -25,11 +25,12 @@ function step!(method::ProxQNSCORE, reg_name, model, hμ, As, x, x_prev, ys, Cma
     λgr = λ .* gr
     Hr_diag = hμ.hess(Cmat,x)
     λHr = λ .* Diagonal(Hr_diag)
-    obj = x -> model.f(x) + get_reg(model, x, reg_name)
+    obj = x -> model.f(As, ys, x) + get_reg(model, x, reg_name)
     if model.grad_fx !== nothing
         grad_f = x -> model.grad_fx(x)
     else
-        grad_f = x -> gradient(model.f, x)
+        f = x -> model.f(As, ys, x)
+        grad_f = x -> gradient(f, x)
     end
     ∇f = grad_f(x) + λgr
     d = -(H + λHr)\∇f

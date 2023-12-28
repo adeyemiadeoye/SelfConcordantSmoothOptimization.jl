@@ -15,6 +15,7 @@ Base.@kwdef mutable struct OWLQN <: ProximalMethod
     y::Vector{Any} = []                 # grad_t+1 - grad_t [max size of memory m]
     rho::Vector{Any} = []               # 1/s[i]'y[i]
     ss_type::Int = 1
+    use_prox::Bool = true
     m::Int = 6           # L-BFGS history length 
     name::String = "prox-owlqn"
     label::String = "OWL-QN (L-BFGS)"
@@ -26,7 +27,7 @@ function init!(method::OWLQN, x)
     return method
 end
 function step!(method::OWLQN, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
-    f = model.f
+    f = x -> model.f(As, ys, x)
     if length(model.λ) > 1
         # λ = 1.0 # pre-multiplication will done for more than one regularization function
         λ = model.λ[1]
@@ -92,8 +93,12 @@ function step!(method::OWLQN, reg_name, model, hμ, As, x, x_prev, ys, Cmat, ite
         end
     end
 
-    prox_m = invoke_prox(model, reg_name, x - step_size*d, one.(x), λ, step_size)
-    x_new = prox_step(prox_m)
+    if method.use_prox
+        prox_m = invoke_prox(model, reg_name, x - step_size*d, one.(x), λ, step_size)
+        x_new = prox_step(prox_m)
+    else
+        x_new = x - step_size*d
+    end
     
     push!(s, x - x_copy)
     push!(y, ∇f(x) - g_copy)

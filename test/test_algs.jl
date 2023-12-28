@@ -6,7 +6,7 @@
     μ = 1
     lb = -1.0
     ub = 1.0
-    f_reg(x) = 1/2*sum(log.(1 .+ exp.(-y .* (A*x))))
+    f_reg(A, y, x) = 1/2*sum(log.(1 .+ exp.(-y .* (A*x))))
     f_reg(y, yhat) = -1/2*sum(y .* log.(yhat) .+ (1 .- y) .* log.(1 .- yhat))
     Mfunc(A, x) = 1 ./ (1 .+ exp.(-A*x))
 
@@ -61,15 +61,23 @@ end
     μ = 0.6
     lb = -1.0
     ub = 1.0
-    f_qp(x) = 0.5*(x' * (A *x)) + (y'*x)
+    f_qp(A, y, x) = 0.5*(x' * (A *x)) + (y'*x)
 
     TOL = 1e-3
 
     @testset "PHuber indbox" begin
         model = Problem(A, y, x0, f_qp, λ; C_set=[lb, ub], sol=x_star)
-        sol = iterate!(ProxNSCORE(), model, "indbox", PHuberSmootherIndBox(lb, ub, μ), α=0.8)
-        @test sol.iters+1 > 1
-        @test sol.rel[end] <= TOL
-        @test sol.objrel[end] <= TOL
+        sol_p = iterate!(ProxNSCORE(), model, "indbox", PHuberSmootherIndBox(lb, ub, μ), α=0.8)
+        @test sol_p.iters+1 > 1
+        @test sol_p.rel[end] <= TOL
+        @test sol_p.objrel[end] <= TOL
+    end
+
+    @testset "Exp indbox" begin
+        model = Problem(A, y, x0, f_qp, λ; C_set=[lb, ub], sol=x_star)
+        sol_e = iterate!(ProxNSCORE(), model, "indbox", ExponentialSmootherIndBox(lb, ub, μ), α=0.8)
+        @test sol_e.iters+1 > 1
+        @test sol_e.rel[end] <= TOL
+        @test sol_e.objrel[end] <= TOL
     end
 end

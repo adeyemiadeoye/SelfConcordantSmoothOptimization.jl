@@ -14,8 +14,8 @@ const exp_smooth_ν = 2.0
 
 function ExponentialSmootherIndBox(lb::VectorOrFloat, ub::VectorOrFloat, mu::IntOrFloat)
     val = x -> exp_smooth_indbox(x;μ=mu,lb=lb,ub=ub)
-    grad = x -> exp_smooth_grad_indbox(x;μ=mu,lb=lb,ub=ub)
-    hess = x -> exp_smooth_hess_indbox(x;μ=mu,lb=lb,ub=ub)
+    grad = (Cmat,x) -> exp_smooth_grad_indbox(x;μ=mu,lb=lb,ub=ub)
+    hess = (Cmat,x) -> exp_smooth_hess_indbox(x;μ=mu,lb=lb,ub=ub)
     
     return ExponentialSmootherIndBox(mu, exp_smooth_Mh, exp_smooth_ν, val, grad, hess)
 end

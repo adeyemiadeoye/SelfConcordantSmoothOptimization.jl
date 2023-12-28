@@ -7,6 +7,7 @@ export iterate!
 export NoSmooth
 export PHuberSmootherL1L2, PHuberSmootherFL, PHuberSmootherGL, PHuberSmootherIndBox
 export OsBaSmootherL1L2, OsBaSmootherGL
+export ExponentialSmootherIndBox
 export get_reg
 
 using LinearAlgebra
@@ -183,6 +184,7 @@ include("algorithms/extras/OWLQN.jl")
 include("smoothing-functions/smoothing.jl")
 include("smoothing-functions/phuber-smooth.jl")
 include("smoothing-functions/ostrovskii-bach-smooth.jl")
+include("smoothing-functions/exponential-smooth.jl")
 
 
 export mean_square_error, psnr_metric, recon_error, sparsity_level, support_error

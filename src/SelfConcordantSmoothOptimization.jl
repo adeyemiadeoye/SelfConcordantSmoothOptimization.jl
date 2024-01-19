@@ -47,14 +47,14 @@ show(io::IO, s::Solution) = show(io, "")
 show(io::IO, s::SolutionPlus) = show(io, "")
 show(io::IO, p::Problem) = show(io, "")
 
-function iter_step!(method::ProximalMethod, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
-    return Vector{Float64}(step!(method, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter))
+function iter_step!(method::ProximalMethod, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
+    return Vector{Float64}(step!(method, model, reg_name, hμ, As, x, x_prev, ys, Cmat, iter))
 end
 
 # for each implemented algorithm, add the name field here
 # TODO automate this in an efficient way
 implemented_algs = ["prox-newtonscore", "prox-ggnscore", "prox-bfgsscore"]
-function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batch_size=nothing, max_iter=1000, x_tol=1e-10, f_tol=1e-10, extra_metrics=false, verbose=1)
+function iterate!(method::ProximalMethod, model::ProxModel, reg_name, hμ; α=nothing, batch_size=nothing, max_iter=1000, x_tol=1e-10, f_tol=1e-10, extra_metrics=false, verbose=1)
     m = size(model.y,1)
     n = size(model.x,1)
     if method.name in implemented_algs
@@ -139,7 +139,7 @@ function iterate!(method::ProximalMethod, model, reg_name, hμ; α=nothing, batc
                 end
             end
 
-            x_new = iter_step!(method, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
+            x_new = iter_step!(method, model, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
             if norm(x_new - x) < x_tol*max.(norm(x), 1) || f_rel_error ≤ f_tol
                 break
             end

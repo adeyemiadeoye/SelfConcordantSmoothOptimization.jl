@@ -26,7 +26,7 @@ function init!(method::OWLQN, x)
     method.rho = []
     return method
 end
-function step!(method::OWLQN, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
+function step!(method::OWLQN, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
     f = x -> model.f(As, ys, x)
     if length(model.λ) > 1
         # λ = 1.0 # pre-multiplication will done for more than one regularization function

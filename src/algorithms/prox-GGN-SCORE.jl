@@ -10,7 +10,7 @@ Base.@kwdef mutable struct ProxGGNSCORE <: ProximalMethod
     label::String = "Prox-GGN-SCORE"
 end
 init!(method::ProxGGNSCORE, x) = method
-function step!(method::ProxGGNSCORE, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
+function step!(method::ProxGGNSCORE, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
     obj = x -> model.f(As, ys, x) + get_reg(model, x, reg_name)
     if length(model.λ) > 1
         λ = model.λ[1]
@@ -22,7 +22,7 @@ function step!(method::ProxGGNSCORE, reg_name, model, hμ, As, x, x_prev, ys, Cm
     Hr_diag = hμ.hess(Cmat,x)
     if all(x->x!==nothing,(model.jac_yx, model.grad_fy, model.hess_fy))
         ŷ = model.out_fn(As, x)
-        J = model.jac_yx(ŷ)
+        J = model.jac_yx(ŷ, x)
         residual = model.grad_fy(ŷ)
         Q = model.hess_fy(ŷ)
     else

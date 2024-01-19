@@ -10,7 +10,7 @@ Base.@kwdef mutable struct ProxGradient <: ProximalMethod
     label::String = "Prox-Grad"
 end
 init!(method::ProxGradient, x) = method
-function step!(method::ProxGradient, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
+function step!(method::ProxGradient, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
     if length(model.λ) > 1
         λ = 1.0 # pre-multiplication will done for more than one regularization function
     else

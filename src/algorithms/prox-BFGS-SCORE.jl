@@ -13,7 +13,7 @@ function init!(method::ProxQNSCORE, x)
 	method.H = Matrix{Float64}(I, size(x,1), size(x,1))
 	return method
 end
-function step!(method::ProxQNSCORE, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
+function step!(method::ProxQNSCORE, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
     if length(model.λ) > 1
         # λ = 1.0 # pre-multiplication will done for more than one regularization function
         λ = model.λ[1]

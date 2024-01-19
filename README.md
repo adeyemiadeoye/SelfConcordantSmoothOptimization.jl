@@ -112,7 +112,7 @@ end;
 
 # The following are used by ProxGGNSCORE
 # Jacobian of yhat wrt x:
-jac_yx(yhat) = vec(yhat .* (1 .- yhat)) .* A;
+jac_yx(yhat, x) = vec(yhat .* (1 .- yhat)) .* A;
 # gradient of \ell wrt yhat:
 grad_fy(yhat) = (-y ./ yhat .+ (1 .- y) ./ (1 .- yhat))/m;
 # Hessian of \ell wrt yhat:

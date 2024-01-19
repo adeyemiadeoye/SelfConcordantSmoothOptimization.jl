@@ -10,7 +10,7 @@ Base.@kwdef mutable struct ProxNSCORE <: ProximalMethod
     label::String = "Prox-N-SCORE"
 end
 init!(method::ProxNSCORE, x) = method
-function step!(method::ProxNSCORE, reg_name, model, hμ, As, x, x_prev, ys, Cmat, iter)
+function step!(method::ProxNSCORE, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
     if length(model.λ) > 1
         λ = model.λ[1]
     else

@@ -24,12 +24,6 @@ function f_deconv(Hs, x::T, ys::B) where{T,B}
     return 0.5/n*sum(abs2.(out_deconv(Hs, x) - ys))
 end
 
-# since I am providing the derivative functions, this is not relevant
-# function f_deconv_y(ŷ::Array{S}, x::T, ys::B) where{S<:Real,T,B}
-#     n = size(ys, 1)
-#     return 0.5/n*sum(abs2.(ŷ - ys))
-# end
-
 function out_deconv(Hs::Function, x::T) where{T}
     return Hs(x)
 end
@@ -52,7 +46,6 @@ function init_SpDeconv_models(N)
     om = 0.95
     a = [1, -2*r*cos(om), r^2]
     hx = filt(b,a,x)
-    # h = filt(b,a,pushfirst!(zeros(N),1)) # Calculate impulse response.
     sigma = 0.2
     noise = sigma*randn(rr(), N)
     y = hx + noise
@@ -69,23 +62,6 @@ function init_SpDeconv_models(N)
 	return A, B, H, y, noise, x
 end
 
-function batch_data(model::ProxModel)
-    N = size(model.y, 1)
-    return [(model.A[i,:],model.B[i,:],model.y[i]) for i in 1:N]
-end
-
-function sample_batch(data, m)
-    # m : batch_size
-    s = sample(data,m,replace=false,ordered=true)
-    As = hcat(map(x->x[1], s)...)'
-    Bs = hcat(map(x->x[2], s)...)'
-    ys = hcat(map(x->x[3], s)...)'
-
-    Hs(xs) = qr(As)\(Bs*xs)
-
-    return Hs, ys
-end
-
 # get derivate functions for the for the linear regression problem
 function get_derivative_fns_deconv(Ah::AbstractArray{Float64,2}, Bh::AbstractArray{Float64,2}, y::VectorOrBitVector{<:IntOrFloat})
     A = Ah \ Bh
@@ -95,7 +71,5 @@ function get_derivative_fns_deconv(Ah::AbstractArray{Float64,2}, Bh::AbstractArr
     jac_yx(ŷ::Vector{Float64}) = A
     grad_fy(y_hat::Array{Float64}) = 2/n * (y_hat - y)
     hess_fy(y_hat::Array{Float64}) = Diagonal((2/n * one.(y_hat)))
-    ## or return the vector:
-    # hess_fy(y_hat) = (2/n * one.(y_hat))
     return grad_fx, hess_fx, jac_yx, grad_fy, hess_fy
 end

@@ -39,7 +39,7 @@ function get_probs(grpNUM)
 end
 
 function get_indgrpSIZES(grpNUM, n; const_grpsize=nothing, probs=nothing)
-    # p: number of variables
+    # p: size of variable
     ind = zeros(Int, 3, grpNUM)
     for i in 1:grpNUM
         if i == 1

@@ -1,7 +1,6 @@
 include("exp-utils-paper.jl");
 using NPZ
 
-# Run the paper experiments and generate plots
 # uncomment the desired line to run
 
 
@@ -9,7 +8,7 @@ using NPZ
 # adjust the parameters according to paper
 
 ## sparse logistic regression
-# @time model, _, sol = solve!("sim_log", "prox-ggnscore"; m=100, n=1000, λ=1, μ=1, max_iter=2000, reg_name="l1", ss_type=1, verbose=2, α=1);
+@time model, _, sol = solve!("sim_log", "prox-ggnscore"; m=100, n=4500, λ=2.0e-1, μ=1, max_iter=2000, reg_name="l1");
 
 ## sparse deconvolution
 # @time model, _, sol = solve!("deconv", "prox-grad"; m=1024, n=200, λ=1e-3, μ=5e-2, max_iter=5000, reg_name="l1", ss_type=1, x_tol=1e-6, f_tol=1e-6, verbose=2, α=1);
@@ -39,12 +38,14 @@ using NPZ
 
 # plot_allresults(results);
 
-# RUNPaperExperiments_α(4000, 100);
+# RUNPaperExperiments_α(200, 3000);
 
-# result, x = RUNPaperExperiments_SGL(1000, 10000);
+# result, _ = RUNPaperExperiments_SGL(1000, 10000);
 
 # plot_performance_profile(n_runs=20);
 
-# plot_reg(ex="1"); # ex="1" or "2" to generate Example 1 and Example 2 figures in Section 2
+
+
+
 
 ;

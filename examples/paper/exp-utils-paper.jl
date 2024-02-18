@@ -10,8 +10,8 @@ using BenchmarkProfiles
 include("splogl1.jl")
 include("spdeconv.jl")
 include("spgrouplasso/spgrouplasso.jl")
-include("benchmark-algos.jl")
 include("load_bcd.jl")
+include("load_ssnal.jl")
 
 markershape = [:dtriangle :rtriangle :rect :diamond :hexagon :xcross :utriangle :ltriangle :pentagon :heptagon :octagon :star4 :star6 :star7 :star8]
 
@@ -71,8 +71,8 @@ end
 function solve!(model_name::String, method_name::String;
                 m=2000, n=300, λ=2.0, ss_type=1, μ=2.0, max_iter=240, x_tol=1e-10, f_tol=1e-10, reg_name="l1", log_reg_problems=nothing, α=1.0, lb=-1.0, ub=1.0, grpsize=100, use_const_grpsize=false, verbose=0, seed=1234)
 
-    #   model_name : {"sim_log", "w1a", "mushrooms", "deconv"}
-    #   method_name : {"prox-ggnscore", "prox-grad", "prox-newtonscore", "prox-owlqn", "panoc", "zerofpr", "f-prox-grad"}
+    #   model_name : {"sim_log", "deconv"}
+    #   method_name : {"prox-ggnscore", "prox-grad", "prox-newtonscore", "prox-owlqn"}
     #   m : number of samples for synthetic data
     #   n : number of features for synthetic data
     #   λ : penalty/regularization parameter
@@ -81,7 +81,6 @@ function solve!(model_name::String, method_name::String;
 
     #   max_iter : maximum number of iterations
     #   reg_name : regularization function to use -> e.g. "l1", "l2"
-    #   batch_size (TODO) : batch sample size per iteration (currently not fully implemented) --> nothing === "use full sample points per iteration"
     if log_reg_problems === nothing
         log_reg_problems = vcat(keys(data_dict)...,"sim_log")
     end
@@ -167,11 +166,11 @@ function get_density()
         m, n = data_dict[data_name][1]
         ext = data_dict[data_name][2] # file extension
         if data_name == "gisette"
-            dataset_path = "examples/paper/data/"*data_name*"_train"
+            dataset_path = "data/"*data_name*"_train"
             A = readdlm(dataset_path*".data")
             y = vec(readdlm(dataset_path*".labels"))
         else
-            dataset_path = "examples/paper/data/"*data_name*ext
+            dataset_path = "data/"*data_name*ext
             A, y = fetch_data(dataset_path, m, n)
         end
         sA = size(A)
@@ -183,30 +182,16 @@ function get_density()
     return d
 end
 
-function plot_reg(;ex="1")
-    file_dir = pwd() * "/examples/paper/figures/"
-    g = x -> norm(x, 1)
-    if ex == "1"
-        ghμ = (μ) -> PHuberSmootherL1L2(μ).val
-    else
-        ghμ = (μ) -> OsBaSmootherL1L2(μ).val
-    end
-    p = plot([g ghμ(0.2) ghμ(0.5) ghμ(1.0)], label=["\$g\$" "\$g □ h_{0.2}\$" "\$g □ h_{0.5}\$" "\$g □ h_{1.0}\$"], legend=:top)
-
-    savefig(p, file_dir * "g_smooth" * ".pdf")
-    return
-end
-    
-
-
 function RUNPaperExperiments()
-    problems_list = ["sim_log", "a1a", "a2a", "a3a", "a4a", "a5a", "mushrooms", "deconv", "sim_gl"]
-    log_reg_problems = problems_list[1:end-1]
+    problems_list = ["sim_log"]
+    log_reg_problems = problems_list[1:end]
+
+
     methods_list = ["prox-newtonscore", "prox-ggnscore", "panoc", "zerofpr", "prox-owlqn", "prox-grad", "f-prox-grad"]
     reg_list = ["l1", "l2"]
 
     results = []
-    n = 4000
+    n = 4500
     for model_name in problems_list
         for method_name in methods_list
             if model_name in log_reg_problems
@@ -246,9 +231,10 @@ function RUNPaperExperiments()
 end
 
 function RUNPaperExperiments_α(m, n)
-    file_dir = pwd() * "/examples/paper/figures/"
+    file_dir = pwd() * "/figures/"
+    yticks = [1e2,1e0,1e-2,1e-4,1e-6,1e-8]
 
-    problems_list = ["sim_log", "mushrooms"]
+    problems_list = ["sim_log"]
     methods_list = ["prox-ggnscore", "prox-newtonscore"]
     alpha_list = [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0]
     reg_name = "l1"
@@ -290,9 +276,9 @@ function RUNPaperExperiments_α(m, n)
             labels = reshape(labels, (1,n))
             max_n = maximum(f_rel_ns)
             max_n = Int(round(max_n/min(max_n,5), digits=0))
-            frelplot_alpha = plot(frel, label=labels, ylabel="\$\\|\\mathcal{L}_k-\\mathcal{L}^*\\| / \\|\\mathcal{L}^*\\|\$", xlabel="iteration number, \$k\$", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xlims=(-Inf,Inf), xticks=0:max_n:10000)
+            frelplot_alpha = plot(frel, label=labels, ylabel="\$\\|\\mathcal{L}_k-\\mathcal{L}^*\\| / \\|\\mathcal{L}^*\\|\$", xlabel="iteration number, \$k\$", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xticks=0:max_n:10000, yticks=yticks, labelfontsize=12, tickfontsize=9)
             savefig(frelplot_alpha, file_dir * pre_dir * "_" * model_name * "_" * method_name * ".pdf")
-            timesplot = plot(ts, frel, label=labels, ylabel="\$\\|\\mathcal{L}_k-\\mathcal{L}^*\\| / \\|\\mathcal{L}^*\\|\$", xlabel="time [s]", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xlims=(-Inf,Inf))
+            timesplot = plot(ts, frel, label=labels, ylabel="\$\\|\\mathcal{L}_k-\\mathcal{L}^*\\| / \\|\\mathcal{L}^*\\|\$", xlabel="time [s]", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), yticks=yticks, labelfontsize=12, tickfontsize=9)
             savefig(timesplot, file_dir * pre_dir * "_t" * "_" * model_name * "_" * method_name * ".pdf")
         end
     end
@@ -304,14 +290,14 @@ end
 function RUNPaperExperiments_SGL(m, n)
     local model, sol_x, obj, mse, num_nz, t
 
-    file_dir = pwd() * "/examples/paper/figures/"
+    file_dir = pwd() * "/figures/"
 
-    methods_list = ["prox-ggnscore", "prox-grad", "bcd"]
+    methods_list = ["prox-ggnscore", "ssnal", "prox-grad", "bcd"]
 
     if n <= 2000
         μ = 1.2
     elseif n == 10000
-        μ = 1.5
+        μ = 1.6
     else
         μ = 1.6
     end
@@ -325,6 +311,7 @@ function RUNPaperExperiments_SGL(m, n)
     plt_title = "\$m=$m\$, \$n=$n\$"
 
     mses = []
+    itertimes = []
     mse_ns = []
 
     for method_name in methods_list
@@ -340,23 +327,36 @@ function RUNPaperExperiments_SGL(m, n)
             method_label = "BCD"
             γ = λ
             model = GroupLasso(model_name, m, n, grpsize, γ, μ; use_const_grpsize=use_const_grpsize)
-            sol_x, obj, mse, num_nz, t = load_bcd_result(model);
+            _, obj, mse, itertime, num_nz, t = load_bcd_result(model)
+        elseif method_name == "ssnal"
+            method_label = "SSNAL"
+            γ = λ
+            model = GroupLasso(model_name, m, n, grpsize, γ, μ; use_const_grpsize=use_const_grpsize)
+            _, obj, mse, itertime, _, num_nz, t = load_ssnal_result(model)
         else
-            model, method_label, sol = solve!(model_name, method_name; m=m, n=n, λ=λ, μ=μ, max_iter=100000, reg_name="gl", grpsize=grpsize, use_const_grpsize=use_const_grpsize, ss_type=1, verbose=2, x_tol=1e-9, α=α)
+            if n ∈ (5000, 10000) && m == 1000
+                x_tol = 1e-6
+            else
+                x_tol = 1e-9
+            end
+            model, method_label, sol = solve!(model_name, method_name; m=m, n=n, λ=λ, μ=μ, max_iter=100000, reg_name="gl", grpsize=grpsize, use_const_grpsize=use_const_grpsize, ss_type=1, verbose=2, x_tol=x_tol, α=α)
             obj = sol.obj
             mse = sol.rel
+            itertime = sol.times
             sol_x = sol.x
-            num_nz = nnz(sparse(sol_x))
+            num_nz = cardcal(sol_x, 0.999)
             t = sol.times[end]
         end
 
         push!(mses, mse)
+        push!(itertimes, max.(itertime,1e-9))
         push!(mse_ns, length(mse))
 
         push!(labels, method_label)
 
         result[method_name]["obj"] = sprintf1("%.4E",obj[end])
         result[method_name]["mse"] = sprintf1("%.4E",mse[end])
+        result[method_name]["iter"] = sprintf1("%d",length(mse))
         result[method_name]["nnz"] = num_nz
         result[method_name]["time"] = sprintf1("%.2f",t)
     end
@@ -366,16 +366,20 @@ function RUNPaperExperiments_SGL(m, n)
     max_n = maximum(mse_ns)
     max_n = Int(round(max_n/min(max_n,10^2), digits=0))
 
-    mseplot = plot(mses, label=labels, ylabel="MSE", xlabel="iteration number, \$k\$", xscale=:log10, yscale=:log10, title="$plt_title", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xlims=(-Inf,Inf), xticks=3)
-
+    xticks = [1e1, 1e2, 1e3, 1e4, 1e5, 1e6]
+    yticks = [1e2,1e0,1e-2,1e-4,1e-6,1e-8]
+    mseplot = plot(mses, label=labels, ylabel="MSE", xlabel="iteration number, \$k\$", xscale=:log10, yscale=:log10, title="$plt_title", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xticks=xticks, yticks=yticks, labelfontsize=12, tickfontsize=9)
     savefig(mseplot, file_dir * "_$(m)_$(n)_mseplot_" * model_name * ".pdf")
+
+    timeplot = plot(itertimes, mses, label=labels, ylabel="MSE", xlabel="time [s]", yscale=:log10, title="$plt_title", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), yticks=yticks, labelfontsize=12, tickfontsize=9)
+    savefig(timeplot, file_dir * "_$(m)_$(n)_timeplot_" * model_name * ".pdf")
 
     return result, model.x
 end
 
 function plot_performance_profile(;n_runs=20)
     local labels, method_label
-    file_dir = pwd() * "/examples/paper/figures/"
+    file_dir = pwd() * "/figures/"
 
     problems_list = keys(data_dict)
     methods_list = [Dict("prox-newtonscore"=>0.2), Dict("prox-newtonscore"=>0.5), Dict("prox-newtonscore"=>1.0), "panoc", "zerofpr", "prox-owlqn", "prox-grad", "f-prox-grad"]
@@ -387,10 +391,8 @@ function plot_performance_profile(;n_runs=20)
     display(d)
 
     T_all = Dict(name=>OrderedDict() for name in problems_list)
-    # It_all = Dict(name=>OrderedDict() for name in problems_list)
 
     T = []
-    # It = []
 
     i = 1
     max_iter = 500
@@ -430,22 +432,17 @@ function plot_performance_profile(;n_runs=20)
             push!(labels, use_this_label)
 
             m_time = mean(m_times)
-            # m_iter = float(length(sol.times))
             if i <= n_probs
                 T_all[model_name][use_this_label] = [m_time]
-                # It_all[model_name][use_this_label] = [m_iter]
             else
                 push!(T_all[model_name][use_this_label], m_time)
-                # push!(It_all[model_name][use_this_label], m_iter)
             end
         end
         i += 1
     end
     for label in labels
         method_times = reduce(vcat, [T_all[name][label] for name in problems_list])
-        # method_iters = reduce(vcat, [It_all[name][label] for name in problems_list])
         push!(T, method_times)
-        # push!(It, method_iters)
     end
 
     perfp = performance_profile(PlotsBackend(), reduce(hcat, T), labels; logscale=false, xlabel="\$\\tau\$", ylabel="\$\\rho(\\tau)\$", linestyle=:auto, legend=:bottomright, _plot_args...)
@@ -460,7 +457,7 @@ function plot_allresults(results)
 
     local data_x, data_y, β, obj_star, x_star
 
-    file_dir = pwd() * "/examples/paper/figures/"
+    file_dir = pwd() * "/figures/"
 
     all_objp = Dict(model.name=>OrderedDict() for (model, _, _, _) in results)
     all_relp = Dict(model.name=>OrderedDict() for (model, _, _, _) in results)
@@ -508,7 +505,7 @@ function plot_allresults(results)
 
 
         if model_name in ["sim_log", "sim_gl"]
-            alias_name = "synthetic dataset: \$m=4000\$, \$n=100\$"
+            alias_name = "synthetic dataset: \$m=100\$, \$n=4500\$"
         elseif model_name in ["deconv-l1", "deconv-l2"]
             alias_name = ""
         else
@@ -525,17 +522,18 @@ function plot_allresults(results)
         max_n = maximum(f_rel_ns)
         max_n = Int(round(max_n/min(max_n,5), digits=0))
 
-        all_objplot = plot(objs, label=label, ylabel="\$\\mathcal{L}_k\$", xlabel="iteration number, \$k\$", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xlims=(-Inf,Inf), xticks=0:max_n:10000)
+        yticks = [1e2,1e0,1e-2,1e-4,1e-6,1e-8]
+
+        all_objplot = plot(objs, label=label, ylabel="\$\\mathcal{L}_k\$", xlabel="iteration number, \$k\$", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xticks=0:max_n:10000, labelfontsize=12, tickfontsize=9)
         savefig(all_objplot, file_dir * "objplot" * "_" * model_name * ".pdf")
 
-        all_frelplot = plot([all_frelp[model_name][method] for method in keys(all_frelp[model_name])], label=label, ylabel="\$\\|\\mathcal{L}_k-\\mathcal{L}^*\\| / \\|\\mathcal{L}^*\\|\$", xlabel="iteration number, \$k\$", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xlims=(-Inf,Inf), xticks=0:max_n:10000)
+        all_frelplot = plot([all_frelp[model_name][method] for method in keys(all_frelp[model_name])], label=label, ylabel="\$\\|\\mathcal{L}_k-\\mathcal{L}^*\\| / \\|\\mathcal{L}^*\\|\$", xlabel="iteration number, \$k\$", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xticks=0:max_n:10000, yticks=yticks, labelfontsize=12, tickfontsize=9)
         savefig(all_frelplot, file_dir * "frelplot" * "_" * model_name * ".pdf")
         
-        label_t = reshape([l for l in label if l != "Prox-GGN-SCORE"], (1,n-1))
-        all_timesplot = plot([all_timesp[model_name][method] for method in keys(all_timesp[model_name]) if method != "Prox-GGN-SCORE"], [all_relp[model_name][method] for method in keys(all_relp[model_name]) if method != "Prox-GGN-SCORE"], label=label_t, ylabel="\$\\|\\mathcal{L}_k-\\mathcal{L}^*\\| / \\|\\mathcal{L}^*\\|\$", xlabel="time [s]", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xlims=(-Inf,Inf))
+        all_timesplot = plot([all_timesp[model_name][method] for method in keys(all_timesp[model_name])], [all_relp[model_name][method] for method in keys(all_relp[model_name])], label=label, ylabel="\$\\|x_k-x^*\\|/\\max\\{\\|x^*\\|,1\\}\$", xlabel="time [s]", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf),  yticks=yticks, labelfontsize=12, tickfontsize=9)
         savefig(all_timesplot, file_dir * "timesplot" * "_" * model_name * ".pdf")
 
-        all_relplot = plot([all_relp[model_name][method] for method in keys(all_relp[model_name])], label=label, ylabel="\$\\|x_k-x^*\\|/\\max\\{\\|x^*\\|,1\\}\$", xlabel="iteration number, \$k\$", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xlims=(-Inf,Inf), xticks=0:max_n:10000)
+        all_relplot = plot([all_relp[model_name][method] for method in keys(all_relp[model_name])], label=label, ylabel="\$\\|x_k-x^*\\|/\\max\\{\\|x^*\\|,1\\}\$", xlabel="iteration number, \$k\$", yscale=:log10, title="$alias_name", titlefontsize=12, linestyle=:dashdot, ylims=(-Inf,Inf), xticks=0:max_n:10000,  yticks=yticks, labelfontsize=12, tickfontsize=9)
         savefig(all_relplot, file_dir * "relplot" * "_" * model_name * ".pdf")
 
 

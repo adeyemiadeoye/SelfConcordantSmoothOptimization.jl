@@ -1,4 +1,4 @@
-using SparseArrays, LinearAlgebra#, NPZ
+using SparseArrays, LinearAlgebra
 using SelfConcordantSmoothOptimization
 
 using Random
@@ -41,12 +41,6 @@ function f_grouplasso(A, x::T, ys::B) where{T,B}
     return 0.5*sum(abs2.(out_lasso(A, x) - ys))
 end
 
-# since I am providing the derivative functions, this is not relevant
-# function f_grouplasso_y(ŷ::Array{S}, x::T, ys::B) where{S<:Real,T,B}
-#     n = size(ys, 1)
-#     return 0.5/n*sum(abs2.(ŷ - ys))
-# end
-
 function out_lasso(A::AbstractArray{S,2}, x::T) where{S<:Real,T}
     return A*x
 end
@@ -85,7 +79,7 @@ function generate_data(m, n, grpNUM, grpSIZES, ind; rho=0.5, p_active=0.1)
     g_start = ind[1,:]
     g_end = ind[2,:]
 
-    # 10% of groups are actives
+    # 10% of groups are active
     gamma1 = ceil(Int, grpNUM * 0.1)
     selected_groups = rand(rr(), 1:grpNUM, gamma1)
     true_coef = zeros(n)
@@ -123,20 +117,6 @@ function make_toeplitz(c)
     return T
 end
 
-function batch_data(model::ProxModel)
-    m = size(model.y, 1)
-    return [(model.A[i,:],model.y[i]) for i in 1:m]
-end
-
-function sample_batch(data, mb)
-    # mb : batch_size
-    s = sample(data,mb,replace=false,ordered=true)
-    As = hcat(map(x->x[1], s)...)'
-    ys = hcat(map(x->x[2], s)...)'
-
-    return As, ys
-end
-
 # get derivate functions for the for the linear regression problem
 function get_derivative_fns_lasso(A::AbstractArray{Float64,2}, y::VectorOrBitVector{<:IntOrFloat})
     m = size(A, 1)
@@ -145,7 +125,5 @@ function get_derivative_fns_lasso(A::AbstractArray{Float64,2}, y::VectorOrBitVec
     jac_yx(ŷ::Vector{Float64}) = A
     grad_fy(y_hat::Array{Float64}) = y_hat - y
     hess_fy(y_hat::Array{Float64}) = Diagonal((one.(y_hat)))
-    ## or return the vector:
-    # hess_fy(y_hat) = (one.(y_hat))
     return grad_fx, hess_fx, jac_yx, grad_fy, hess_fy
 end

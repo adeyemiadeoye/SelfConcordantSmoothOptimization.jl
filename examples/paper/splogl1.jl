@@ -23,13 +23,6 @@ function f_splog(Hs::AbstractArray{S,2}, x::T, ys::B) where{S<:Real,T,B}
     return 1/n*sum(log.(1 .+ exp.(-ys .* (Hs*x))))
 end
 
-# since I am providing the derivative functions, this is not relevant
-# function f_splog_y(ŷ::Array{S,1}, x::T, ys::B) where{S<:Real,T,B}
-#     n = size(ys, 1)
-#     return -1/n*sum(ys .* log.(ŷ) .+ (1 .- ys) .* log.(1 .- ŷ))
-#     # return 1/n*sum(log.(1 .+ exp.(-ys .* ŷ)))
-# end
-
 function out_splog(A::AbstractArray{S,2}, x::T) where{S<:Real,T}
     return 1 ./ (1 .+ exp.(-A*x))
 end
@@ -60,7 +53,7 @@ function init_Log_model(data_name; m=1000, n=100, seed=1234)
         if m > n
             density = 0.85
         else
-            density = 0.1
+            density = 0.08
         end
         A = Matrix(sprandn(rr(seed=seed), m, n, density))
         true_coef = zeros(n)
@@ -73,14 +66,8 @@ function init_Log_model(data_name; m=1000, n=100, seed=1234)
     else
         m, n = data_dict[data_name][1]
         ext = data_dict[data_name][2] # file extension
-        if ext == ".bz2"
-            dataset_path = "examples/paper/data/"*data_name*"_train"
-            A = readdlm(dataset_path*".data")
-            y = vec(readdlm(dataset_path*".labels"))
-        else
-            dataset_path = "examples/paper/data/"*data_name*ext
-            A, y = fetch_data(dataset_path, m, n)
-        end
+        dataset_path = "data/"*data_name*ext
+        A, y = fetch_data(dataset_path, m, n)
         unique_y = unique(y)
         y = map(x -> x==unique_y[1] ? -1 : 1, y)
         x0 = rand(rr(seed=seed), n)
@@ -88,20 +75,6 @@ function init_Log_model(data_name; m=1000, n=100, seed=1234)
     end
 
 	return A, y, x0, x_star
-end
-
-function batch_data(model::ProxModel)
-    m = size(model.y, 1)
-    return [(model.A[i,:],model.y[i]) for i in 1:m]
-end
-
-function sample_batch(data, mb)
-    # mb : batch_size
-    s = sample(data,mb,replace=false,ordered=true)
-    As = Array(hcat(map(x->x[1], s)...)')
-    ys = Array(hcat(map(x->x[2], s)...)')
-
-    return As, ys
 end
 
 # adapted from https://github.com/TheoGuyard/LIBSVMdata.jl/blob/f20a70703f16044c5c9da8046fcc0d3ca7428d00/src/LIBSVMdata.jl#L84
@@ -177,8 +150,6 @@ function get_derivative_fns_splog(A::Array{Float64,2}, y::VectorOrBitVector{<:In
     end
     grad_fy(y_hat::Array{Float64}) = (-y ./ y_hat .+ (1 .- y) ./ (1 .- y_hat))/m
     hess_fy(y_hat::Array{Float64}) = Diagonal((y ./ y_hat.^2 + (1 .- y) ./ (1 .- y_hat).^2)/m)
-    ## or return the vector:
-    # hess_fy(y_hat) = (y ./ y_hat.^2 .+ (1 .- y) ./ (1 .- y_hat).^2)./n
     
     return grad_fx, hess_fx, jac_yx, grad_fy, hess_fy
 end

@@ -299,7 +299,7 @@ function RUNPaperExperiments_SGL(m, n)
     elseif n == 10000
         μ = 1.6
     else
-        μ = 1.6
+        μ = 2.0
     end
 
     model_name = "sim_gl"

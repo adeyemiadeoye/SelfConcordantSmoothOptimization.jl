@@ -3,10 +3,10 @@
 
 ```
 @article{adeoye2023self,
-  title={Self-concordant Smoothing for Convex Composite Optimization},
+  title={Self-concordant Smoothing for Large-Scale Convex Composite Optimization},
   author={Adeoye, Adeyemi D and Bemporad, Alberto},
   journal={arXiv preprint arXiv:2309.01781},
-  year={2023}
+  year={2024}
 }
 ```
 

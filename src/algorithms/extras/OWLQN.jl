@@ -26,6 +26,12 @@ function init!(method::OWLQN, x)
     method.rho = []
     return method
 end
+function set_name!(method::OWLQN, implemented_algs)
+    if method.use_prox == false
+        method.name = "owlqn"
+    end
+    return method
+end
 function step!(method::OWLQN, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
     f = x -> model.f(As, ys, x)
     if length(model.λ) > 1
@@ -38,7 +44,7 @@ function step!(method::OWLQN, model::ProxModel, reg_name, hμ, As, x, x_prev, ys
     reg_fn = x -> get_reg(model, x, reg_name)
 
     if model.grad_fx !== nothing
-        ∇f = x -> model.grad_fx(x)
+        ∇f = x -> model.grad_fx(As, ys, x)
     else
         ∇f = x -> gradient(f, x)
     end
@@ -84,7 +90,7 @@ function step!(method::OWLQN, model::ProxModel, reg_name, hμ, As, x, x_prev, ys
             step_size, x_new = projected_backtracking_line_search_update(f, reg_fn, pg, x, d)
         end
     else
-        # fancy way to do  x .-= g
+        # aka  x .-= g
         d = pg
         if method.ss_type == 1 && model.L !== nothing
             step_size = 1/model.L

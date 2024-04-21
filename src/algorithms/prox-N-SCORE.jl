@@ -10,6 +10,16 @@ Base.@kwdef mutable struct ProxNSCORE <: ProximalMethod
     label::String = "Prox-N-SCORE"
 end
 init!(method::ProxNSCORE, x) = method
+function set_name!(method::ProxNSCORE, implemented_algs)
+    if method.use_prox == false
+        method.name = "newtonscore"
+        method.label = "Newton-SCORE"
+        push!(implemented_algs, "newtonscore")
+    else
+        push!(implemented_algs, method.name)
+    end
+    return method
+end
 function step!(method::ProxNSCORE, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
     if length(model.λ) > 1
         λ = model.λ[1]
@@ -22,8 +32,8 @@ function step!(method::ProxNSCORE, model::ProxModel, reg_name, hμ, As, x, x_pre
     λHr = λ .* Diagonal(Hr_diag)
     obj = x -> model.f(As, ys, x) + get_reg(model, x, reg_name)
     if all(x->x!==nothing,(model.grad_fx, model.hess_fx))
-        H = model.hess_fx(x)
-        grad_f = x -> model.grad_fx(x)
+        H = model.hess_fx(As, ys, x)
+        grad_f = x -> model.grad_fx(As, ys, x)
     else
         f = x -> model.f(As, ys, x)
         H = hessian(f, x)

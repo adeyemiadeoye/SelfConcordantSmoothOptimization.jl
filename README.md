@@ -66,7 +66,7 @@ model = Problem(A, y, x0, f, λ);
 
 # Choose method and run the solver (see ProxGGNSCORE below)
 method = ProxNSCORE();
-solution = iterate!(method, model, reg_name, hμ; max_iter=100, x_tol=1e-6, f_tol=1e-6);
+solution = iterate!(method, model, reg_name, hμ; max_epoch=100, x_tol=1e-6, f_tol=1e-6);
 # get the solution x
 solution.x
 ```
@@ -78,13 +78,13 @@ f(A, y, x) = 1/m*sum(log.(1 .+ exp.(-y .* (A*x))));
 # f as a function of y and yhat
 f(y, yhat) = -1/m*sum(y .* log.(yhat) .+ (1 .- y) .* log.(1 .- yhat))
 # where yhat = Mfunc(A, x) is defined by the model output function
-Mfunc(A, x) = 1 ./ (1 .+ exp.(-A*x))
+Mfunc(A, x) = vcat([1 ./ (1 .+ exp.(-A*x))]...)
 # set problem
 model = Problem(A, y, x0, f, λ; out_fn=Mfunc);
 
 # Choose method and run the solver
 method = ProxGGNSCORE();
-solution = iterate!(method, model, reg_name, hμ; max_iter=100, x_tol=1e-6, f_tol=1e-6);
+solution = iterate!(method, model, reg_name, hμ; max_epoch=100, x_tol=1e-6, f_tol=1e-6);
 # get the solution x
 solution.x
 ```
@@ -98,12 +98,12 @@ f(A, y, x) = 1/m*sum(log.(1 .+ exp.(-y .* (A*x))));
 
 S(x) = exp.(-y .* (A*x));
 # gradient of f wrt x:
-function grad_fx(x)
+function grad_fx(A, y, x)
     Sx = S(x)
     return -A' * (y .* (Sx ./ (1 .+ Sx))) / m
 end;
 # Hessian of f wrt x:
-function hess_fx(x)
+function hess_fx(A, y, x)
     Sx = 1 ./ (1 .+ S(x))
     W = Diagonal(Sx .* (1 .- Sx))
     hess = A' * W * A
@@ -112,24 +112,24 @@ end;
 
 # The following are used by ProxGGNSCORE
 # Jacobian of yhat wrt x:
-jac_yx(yhat, x) = vec(yhat .* (1 .- yhat)) .* A;
+jac_yx(A, y, yhat, x) = vec(yhat .* (1 .- yhat)) .* A;
 # gradient of \ell wrt yhat:
-grad_fy(yhat) = (-y ./ yhat .+ (1 .- y) ./ (1 .- yhat))/m;
+grad_fy(A, y, yhat) = (-y ./ yhat .+ (1 .- y) ./ (1 .- yhat))/m;
 # Hessian of \ell wrt yhat:
-hess_fy(yhat) = Diagonal((y ./ yhat.^2 + (1 .- y) ./ (1 .- yhat).^2)/m);
+hess_fy(A, y, yhat) = Diagonal((y ./ yhat.^2 + (1 .- y) ./ (1 .- yhat).^2)/m);
 ```
 ```julia
 # Now (for ProxNSCORE):
 model_n = Problem(A, y, x0, f, λ; grad_fx=grad_fx, hess_fx=hess_fx);
 method_n = ProxNSCORE();
-sol_n = iterate!(method_n, model_n, reg_name, hμ; max_iter=100, x_tol=1e-6, f_tol=1e-6);
+sol_n = iterate!(method_n, model_n, reg_name, hμ; max_epoch=100, x_tol=1e-6, f_tol=1e-6);
 sol_n.x
 ```
 ```julia
 # And for ProxGGNSCORE (does not require hess_fx):
 model_ggn = Problem(A, y, x0, f, λ; out_fn=Mfunc, grad_fx=grad_fx, jac_yx=jac_yx, grad_fy=grad_fy, hess_fy=hess_fy);
 method_ggn = ProxGGNSCORE();
-sol_ggn = iterate!(method_ggn, model_ggn, reg_name, hμ; max_iter=100, x_tol=1e-6, f_tol=1e-6);
+sol_ggn = iterate!(method_ggn, model_ggn, reg_name, hμ; max_epoch=100, x_tol=1e-6, f_tol=1e-6);
 sol_ggn.x
 ```
 (For sparse group lasso example, see example from paper in `/examples/paper`).

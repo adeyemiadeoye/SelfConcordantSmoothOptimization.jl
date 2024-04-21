@@ -78,37 +78,3 @@ function projected_backtracking_line_search_update(f::Function, reg_fn::Function
     end
     return α, xt
 end
-
-
-using StatsBase
-# SOME METRICS, probably not necessary (to remove)
-
-# Mean Squared Error (MSE)
-function mean_square_error(original_signal, reconstructed_signal)
-    return mean(abs2, original_signal - reconstructed_signal)
-end
-
-# Peak Signal-to-Noise Ratio (PSNR)
-function psnr_metric(original_signal, reconstructed_signal; max_signal=maximum(original_signal)^2)
-    mse_val = mean_square_error(original_signal, reconstructed_signal)
-    return 20 * log10(max_signal) - 10 * log10(mse_val)
-end
-
-# Reconstruction Error (RE)
-function recon_error(original_signal, reconstructed_signal)
-    # return sum(abs2, original_signal - reconstructed_signal)
-    return norm(original_signal - reconstructed_signal, 2)
-end
-
-function support_error(original_signal, reconstructed_signal; eps=1e-3)
-    s = x -> abs(x)>eps ? 1 : 0
-    se = s.(original_signal)
-    se_hat = s.(reconstructed_signal)
-    return norm(se - se_hat, 0)
-end
-
-
-# Sparsity Level
-function sparsity_level(reconstructed_signal)
-    return count(!iszero, reconstructed_signal) / length(reconstructed_signal)
-end

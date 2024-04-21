@@ -10,6 +10,16 @@ Base.@kwdef mutable struct ProxGGNSCORE <: ProximalMethod
     label::String = "Prox-GGN-SCORE"
 end
 init!(method::ProxGGNSCORE, x) = method
+function set_name!(method::ProxGGNSCORE, implemented_algs)
+    if method.use_prox == false
+        method.name = "ggnscore"
+        method.label = "GGN-SCORE"
+        push!(implemented_algs, "ggnscore")
+    else
+        push!(implemented_algs, method.name)
+    end
+    return method
+end
 function step!(method::ProxGGNSCORE, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
     obj = x -> model.f(As, ys, x) + get_reg(model, x, reg_name)
     if length(model.λ) > 1
@@ -22,9 +32,9 @@ function step!(method::ProxGGNSCORE, model::ProxModel, reg_name, hμ, As, x, x_p
     Hr_diag = hμ.hess(Cmat,x)
     if all(x->x!==nothing,(model.jac_yx, model.grad_fy, model.hess_fy))
         ŷ = model.out_fn(As, x)
-        J = model.jac_yx(ŷ, x)
-        residual = model.grad_fy(ŷ)
-        Q = model.hess_fy(ŷ)
+        J = model.jac_yx(As, ys, ŷ, x)
+        residual = model.grad_fy(As, ys, ŷ)
+        Q = model.hess_fy(As, ys, ŷ)
     else
         m_out_fn = x -> model.out_fn(As, x)
         ŷ = m_out_fn(x)

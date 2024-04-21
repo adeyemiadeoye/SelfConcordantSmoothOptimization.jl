@@ -5,6 +5,7 @@ export ProxQNSCORE
 # A Proximal Quasi-Newton method (BFGS)
 Base.@kwdef mutable struct ProxQNSCORE <: ProximalMethod
     ss_type::Int = 1
+    use_prox::Bool = true
     H::Matrix{Float64} = Matrix{Float64}(I, 1, 1)
     name::String = "prox-bfgsscore"
     label::String = "Prox-QN-SCORE (BFGS)"
@@ -12,6 +13,16 @@ end
 function init!(method::ProxQNSCORE, x)
 	method.H = Matrix{Float64}(I, size(x,1), size(x,1))
 	return method
+end
+function set_name!(method::ProxQNSCORE, implemented_algs)
+    if method.use_prox == false
+        method.name = "bfgsscore"
+        method.label = "BFGS-SCORE"
+        push!(implemented_algs, "bfgsscore")
+    else
+        push!(implemented_algs, method.name)
+    end
+    return method
 end
 function step!(method::ProxQNSCORE, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
     if length(model.λ) > 1
@@ -27,7 +38,7 @@ function step!(method::ProxQNSCORE, model::ProxModel, reg_name, hμ, As, x, x_pr
     λHr = λ .* Diagonal(Hr_diag)
     obj = x -> model.f(As, ys, x) + get_reg(model, x, reg_name)
     if model.grad_fx !== nothing
-        grad_f = x -> model.grad_fx(x)
+        grad_f = x -> model.grad_fx(As, ys, x)
     else
         f = x -> model.f(As, ys, x)
         grad_f = x -> gradient(f, x)
@@ -64,8 +75,12 @@ function step!(method::ProxQNSCORE, model::ProxModel, reg_name, hμ, As, x, x_pr
     # ensure αₖ satisfies the theoretical condition
     # (actually satisfies it for many convex problems)
     safe_α = min(1, α)
-    prox_m = invoke_prox(model, reg_name, x + safe_α*d, Hdiag_inv, λ, step_size)
-    x_new = prox_step(prox_m)
+    if method.use_prox
+        prox_m = invoke_prox(model, reg_name, x + safe_α*d, Hdiag_inv, λ, step_size)
+        x_new = prox_step(prox_m)
+    else
+        x_new = x + safe_α*d
+    end
 
     ∇f_new = grad_f(x_new)
     δh = x_new - x

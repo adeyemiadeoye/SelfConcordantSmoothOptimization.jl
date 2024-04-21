@@ -30,6 +30,8 @@ mutable struct Problem <: ProxModel
     x0                  # initial x
     f                   # smooth part of the objective function
     λ                   # penalty parameter
+    Atest               # optional test input data
+    ytest               # target for test input data
     L                   # gradient's Lipschitz constant or 1/α
     x                   # optimization variable (solution)
     C_set               # contains upper and lower bound of a box-constrained QP problem
@@ -69,6 +71,8 @@ function Problem(
             x0::Vector{Float64},
             f::Function,
             λ::IntFloatVectorOrTupleOfTwo;
+            Atest::Union{OperatorOrArray2, Nothing}=nothing,
+            ytest::Union{VectorBitVectorOrArray2{<:Real}, Nothing}=nothing,
             Lf::Union{IntOrFloat, Nothing}=nothing,
             sol::Vector{Float64}=zero(x0),
             C_set::IntervalVectorTupleOrNothing=nothing,
@@ -81,7 +85,7 @@ function Problem(
             grad_fy::FuncOrNothing=nothing,
             hess_fy::FuncOrNothing=nothing,
             name::StringOrNothing=nothing)
-    return Problem(A, y, x0, f, λ, Lf, sol, C_set, Bop, P, out_fn, grad_fx, hess_fx, jac_yx, grad_fy, hess_fy, name)
+    return Problem(A, y, x0, f, λ, Atest, ytest, Lf, sol, C_set, Bop, P, out_fn, grad_fx, hess_fx, jac_yx, grad_fy, hess_fy, name)
 end
 
 # implement all currently supported regularization functions here

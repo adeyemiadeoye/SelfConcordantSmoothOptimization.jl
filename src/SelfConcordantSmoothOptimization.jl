@@ -2,7 +2,6 @@ module SelfConcordantSmoothOptimization
 
 export ProximalMethod
 export Solution
-export SolutionPlus
 export iterate!
 export NoSmooth
 export PHuberSmootherL1L2, PHuberSmootherFL, PHuberSmootherGL, PHuberSmootherIndBox
@@ -11,6 +10,7 @@ export ExponentialSmootherIndBox
 export get_reg
 
 using LinearAlgebra
+using MLUtils
 using ForwardDiff: gradient, hessian, jacobian
 using Dates
 
@@ -19,44 +19,35 @@ import Base.show
 include("problems.jl")
 include("prox-operators.jl")
 include("utils/alg-utils.jl")
+include("utils/utils.jl")
 
 abstract type ProximalMethod end
 
-struct Solution{A, O, R, R2, T, K, M}
+struct Solution{A, O, R, R2, D, T, K, M}
     x::A
     obj::O
+    fval::O
+    fvaltest::O
     rel::R
     objrel::R2
+    metricvals::D
     times::T
-    iters::K
-    model::M
-end
-
-struct SolutionPlus{A, O, R, R2, T, K, D, M}
-    x::A
-    obj::O
-    rel::R
-    objrel::R2
-    times::T
-    iters::K
-    metrics::D
+    epochs::K
     model::M
 end
 
 show(io::IO, s::Solution) = show(io, "")
-show(io::IO, s::SolutionPlus) = show(io, "")
 show(io::IO, p::Problem) = show(io, "")
 
 function iter_step!(method::ProximalMethod, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
     return Vector{Float64}(step!(method, model, reg_name, hμ, As, x, x_prev, ys, Cmat, iter))
 end
 
-# for each implemented algorithm, add the name field here
-# TODO automate this in an efficient way
-implemented_algs = ["prox-newtonscore", "prox-ggnscore", "prox-bfgsscore"]
-function iterate!(method::ProximalMethod, model::ProxModel, reg_name, hμ; α=nothing, batch_size=nothing, max_iter=1000, x_tol=1e-10, f_tol=1e-10, extra_metrics=false, verbose=1)
+function iterate!(method::ProximalMethod, model::ProxModel, reg_name, hμ; metrics::Union{Dict{A,B},Nothing}=nothing, α=nothing, batch_size=nothing, slice_samples=false, shuffle_batch=true, max_epoch=1000, x_tol=1e-10, f_tol=1e-10, verbose=1) where {A,B}
+    implemented_algs = []
+    set_name!(method, implemented_algs)
     m = size(model.y,1)
-    n = size(model.x,1)
+    ny = size(model.y,2)
     if method.name in implemented_algs
         if α !== nothing
             model.L = 1/α
@@ -65,33 +56,55 @@ function iterate!(method::ProximalMethod, model::ProxModel, reg_name, hμ; α=no
             @info "Neither L nor α is set for the problem... Now fixing α = 0.5..."
         end
     end
-    if batch_size !== nothing && batch_size < m
-        data = batch_data(model)
-        minibatch_mode = true
+    if batch_size !== nothing && slice_samples
+        @info "Cannot use both batch_size and slice_samples=true...\nNow setting slice_samples=false..."
+        slice_samples = false # prioritize mini-batching
+    end
+    if slice_samples
+        data = slice_data(model)
+        batch_size = 1
+    elseif batch_size !== nothing
+        data = DataLoader((data=model.A', label=model.y'), batchsize=batch_size, shuffle=shuffle_batch)
     else
-        minibatch_mode = false
         batch_size = m
+        data = DataLoader((data=model.A', label=model.y'), batchsize=batch_size)
     end
-    if extra_metrics
-        deconv_metrics = ["psnr", "mse", "re", "se", "sparsity_level"]
-        metrics = Dict(metric=>[] for metric in deconv_metrics)
-    end
+    fvals = []
+    fvaltests = []
     objs = []
     rel_errors = []
     f_rel_errors = []
+    metric_vals = Dict()
+    if metrics !== nothing
+        for name in keys(metrics)
+            metric_vals[name] = []
+        end
+    end
     times = []
-    iters = 0
+    epochs = 0
     x_star = model.x
     f(x) = model.f(model.A, model.y, x)
+    test_model = all(x->x!==nothing, (model.Atest, model.ytest))
+    if xor(model.Atest===nothing, model.ytest===nothing)
+        @info "Both input (Atest) and target (ytest) data are required for testing the model, but only one of these has been provided.\nWill skip testing..."
+    elseif test_model
+        ftest(x) = model.f(model.Atest, model.ytest, x)
+    end
     obj_star = f(x_star) + get_reg(model, x_star, reg_name)
     x = model.x0
     x_prev = deepcopy(x)
+    l_split = "="^30*"\n"
     init!(method, x)
     t0 = now()
-    for iter in 1:max_iter
+    for epoch_t in 1:max_epoch
         Δtime = (now() - t0).value/1000
+        epoch = epoch_t-1
 
-        obj = f(x) + get_reg(model, x, reg_name)
+        fval = f(x)
+        obj = fval + get_reg(model, x, reg_name)
+        if test_model
+            fvaltest = ftest(x)
+        end
 
         if reg_name == "gl"# && model.L !==nothing
             Cmat = model.P.Cmat
@@ -103,44 +116,109 @@ function iterate!(method::ProximalMethod, model::ProxModel, reg_name, hμ; α=no
         
         f_rel_error = max((norm(obj - obj_star))/norm(obj_star), f_tol)
         push!(times, Δtime)
+        if metrics !== nothing
+            for name in keys(metrics)
+                push!(metric_vals[name], metrics[name](model, x))
+            end
+        end
         if verbose > 1
-            solve_info = "Epoch $(iter-1) \t Loss: $obj \t x_rel: $rel_error \t Time: $Δtime"
-            println(solve_info)
-            flush(stdout)
+            @eval(@showval("Optimizer", $method.label))
+            if test_model
+                push!(fvaltests, fvaltest)
+                @show epoch obj fval fvaltest rel_error Δtime
+            else
+                @show epoch obj fval rel_error Δtime
+            end
+            if metrics !== nothing
+                for name in keys(metrics)
+                    @eval(@showval($name, $metric_vals[$name][$epoch_t]))
+                end
+            end
+            print(l_split)
         end
         push!(objs, obj)
+        push!(fvals, fval)
         push!(rel_errors, rel_error)
         push!(f_rel_errors, f_rel_error)
 
-        # if we are interested in metrics related to some a sparse deconvolution problem
-        if extra_metrics
-            push!(metrics["psnr"], psnr_metric(model.x, x))
-            push!(metrics["mse"], mean_square_error(model.x, x))
-            push!(metrics["re"], recon_error(model.x, x))
-            push!(metrics["se"], support_error(model.x, x; eps=1e-3))
-            push!(metrics["sparsity_level"], sparsity_level(x))
-        end
-
-        for i in 1:batch_size:m
-            if minibatch_mode
-                As, ys = sample_batch(data, batch_size)
-            else
-                As, ys = model.A, model.y
-            end
+        iend = Int(ceil(m/batch_size))
+        for (i, sample) in enumerate(data)
+            As, ys = sample
+            ny == 1 ? (As, ys) = (Matrix(As'), vec(ys')) : (As, ys) = (Matrix(As'), Matrix(ys'))
 
             if verbose > 2
-                print("[$(Int(ceil(i/batch_size)))/$(Int(ceil(m/batch_size)))] ")
-                if iter==max_iter && i==(1:batch_size:m)[end]
+                if (i in [1, iend]) || (i%100==0)
+                    print("\n[$i/$iend]")
+                else
+                    print("#")
+                end
+                if epoch_t==max_epoch && i==iend
                     Δtime = (now() - t0).value/1000
-                    obj = f(x) + get_reg(model, x, reg_name)
-                    solve_info = "\nEpoch $iter \t Loss: $obj \t x_rel: $rel_error \t Time: $Δtime"
-                    println(solve_info)
-                    flush(stdout)
+                    fval = f(x)
+                    obj = fval + get_reg(model, x, reg_name)
+                    print("\n"*l_split)
+                    @eval(@showval("Optimizer", $method.label))
+                    if test_model
+                        fvaltest = ftest(x)
+                        push!(fvaltests, fvaltest)
+                        @show max_epoch obj fval fvaltest rel_error Δtime
+                    else
+                        @show max_epoch obj fval rel_error Δtime
+                    end
+                    if metrics !== nothing
+                        for name in keys(metrics)
+                            push!(metric_vals[name], metrics[name](model, x))
+                        end
+                        for name in keys(metrics)
+                            @eval(@showval($name, $metric_vals[$name][end]))
+                        end
+                    end
+                    f_rel_error = max((norm(obj - obj_star))/norm(obj_star), f_tol)
+                    push!(objs, obj)
+                    push!(fvals, fval)
+                    push!(rel_errors, rel_error)
+                    push!(f_rel_errors, f_rel_error)
+                    push!(times, Δtime)
                 end
             end
 
-            x_new = iter_step!(method, model, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
+            x_new = iter_step!(method, model, reg_name, hμ, As, x, x_prev, ys, Cmat, epoch_t)
             if norm(x_new - x) < x_tol*max.(norm(x), 1) || f_rel_error ≤ f_tol
+                if epoch_t != max_epoch
+                    terminate_epoch = epoch_t
+                    Δtime = (now() - t0).value/1000
+                    fval = f(x)
+                    obj = fval + get_reg(model, x, reg_name)
+                    if verbose > 2
+                        print("\n"*l_split)
+                        @eval(@showval("Optimizer", $method.label))
+                    end
+                    if test_model
+                        fvaltest = ftest(x)
+                        push!(fvaltests, fvaltest)
+                        if verbose > 2
+                            @show terminate_epoch obj fval fvaltest rel_error Δtime
+                        end
+                    elseif verbose > 2
+                        @show terminate_epoch obj fval rel_error Δtime
+                    end
+                    if metrics !== nothing
+                        for name in keys(metrics)
+                            push!(metric_vals[name], metrics[name](model, x))
+                        end
+                        if verbose > 2
+                            for name in keys(metrics)
+                                @eval(@showval($name, $metric_vals[$name][end]))
+                            end
+                        end
+                    end
+                    f_rel_error = max((norm(obj - obj_star))/norm(obj_star), f_tol)
+                    push!(objs, obj)
+                    push!(fvals, fval)
+                    push!(rel_errors, rel_error)
+                    push!(f_rel_errors, f_rel_error)
+                    push!(times, Δtime)
+                end
                 break
             end
             x_prev = deepcopy(x)
@@ -151,27 +229,12 @@ function iterate!(method::ProximalMethod, model::ProxModel, reg_name, hμ; α=no
             break
         end
 
-        iters += 1
+        epochs += 1
+        if verbose > 2
+            print("\n"*l_split)
+        end
     end
-    if extra_metrics
-        return SolutionPlus(x, objs, rel_errors, f_rel_errors, times, iters, metrics, model)
-    else
-        return Solution(x, objs, rel_errors, f_rel_errors, times, iters, model)
-    end
-end
-
-function batch_data(model::ProxModel)
-    m = size(model.y, 1)
-    return [(model.A[i,:],model.y[i,:]) for i in 1:m]
-end
-
-function sample_batch(data, mb)
-    # mb : batch_size
-    s = sample(data,mb,replace=false,ordered=true)
-    As = Array(hcat(map(x->x[1], s)...)')
-    ys = Array(hcat(map(x->x[2], s)...)')
-
-    return As, ys
+    return Solution(x, objs, fvals, fvaltests, rel_errors, f_rel_errors, metric_vals, times, epochs, model)
 end
 
 include("algorithms/prox-N-SCORE.jl")
@@ -187,6 +250,6 @@ include("smoothing-functions/ostrovskii-bach-smooth.jl")
 include("smoothing-functions/exponential-smooth.jl")
 
 
-export mean_square_error, psnr_metric, recon_error, sparsity_level, support_error
+export mean_square_error
 
 end

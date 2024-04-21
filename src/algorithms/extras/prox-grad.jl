@@ -10,6 +10,13 @@ Base.@kwdef mutable struct ProxGradient <: ProximalMethod
     label::String = "Prox-Grad"
 end
 init!(method::ProxGradient, x) = method
+function set_name!(method::ProxGradient, implemented_algs)
+    if method.use_prox == false
+        method.name = "grad"
+        method.label = "Grad. Descent"
+    end
+    return method
+end
 function step!(method::ProxGradient, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
     if length(model.λ) > 1
         λ = 1.0 # pre-multiplication will done for more than one regularization function
@@ -20,7 +27,7 @@ function step!(method::ProxGradient, model::ProxModel, reg_name, hμ, As, x, x_p
     Hr_diag = hμ.hess(Cmat,x)
     obj = x -> model.f(As, ys, x) + get_reg(model, x, reg_name)
     if model.grad_fx !== nothing
-        grad_f = x -> model.grad_fx(x)
+        grad_f = x -> model.grad_fx(As, ys, x)
     else
         f = x -> model.f(As, ys, x)
         grad_f = x -> gradient(f, x)
@@ -39,7 +46,6 @@ function step!(method::ProxGradient, model::ProxModel, reg_name, hμ, As, x, x_p
         γ = ∇f - ∇f_prev
 
         L_val = (γ ⋅ γ)/(δ' * γ) # Barzilai-Borwein (BB) step-size
-        # L_val = (δ' if iter == 1
         if iter == 1
             step_size = 1
         else

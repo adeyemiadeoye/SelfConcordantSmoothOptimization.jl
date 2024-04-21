@@ -8,7 +8,7 @@
     ub = 1.0
     f_reg(A, y, x) = 1/2*sum(log.(1 .+ exp.(-y .* (A*x))))
     f_reg(y, yhat) = -1/2*sum(y .* log.(yhat) .+ (1 .- y) .* log.(1 .- yhat))
-    Mfunc(A, x) = 1 ./ (1 .+ exp.(-A*x))
+    Mfunc(A, x) = vcat([1 ./ (1 .+ exp.(-A*x))]...)
 
     TOL = 1e-6
 
@@ -17,8 +17,8 @@
         sol_l1 = iterate!(ProxNSCORE(), model, "l1", PHuberSmootherL1L2(μ))
         sol_l2 = iterate!(ProxNSCORE(), model, "l2", PHuberSmootherL1L2(μ))
         @test model.x ≈ zeros(2)
-        @test sol_l1.iters+1 > 1
-        @test sol_l2.iters+1 > 1
+        @test sol_l1.epochs+1 ≥ 1
+        @test sol_l2.epochs+1 ≥ 1
         @test sol_l1.rel[end] <= TOL
         @test sol_l2.rel[end] <= TOL
         @test sol_l1.objrel[end] <= TOL
@@ -30,8 +30,8 @@
         sol_l1 = iterate!(ProxGGNSCORE(), model, "l1", PHuberSmootherL1L2(μ))
         sol_l2 = iterate!(ProxGGNSCORE(), model, "l2", PHuberSmootherL1L2(μ))
         @test model.x ≈ zeros(2)
-        @test sol_l1.iters+1 > 1
-        @test sol_l2.iters+1 > 1
+        @test sol_l1.epochs+1 ≥ 1
+        @test sol_l2.epochs+1 ≥ 1
         @test sol_l1.rel[end] <= TOL
         @test sol_l2.rel[end] <= TOL
         @test sol_l1.objrel[end] <= TOL
@@ -43,8 +43,34 @@
         sol_l1 = iterate!(ProxQNSCORE(), model, "l1", PHuberSmootherL1L2(μ))
         sol_l2 = iterate!(ProxQNSCORE(), model, "l2", PHuberSmootherL1L2(μ))
         @test model.x == zeros(2)
-        @test sol_l1.iters+1 > 1
-        @test sol_l2.iters+1 > 1
+        @test sol_l1.epochs+1 ≥ 1
+        @test sol_l2.epochs+1 ≥ 1
+        @test sol_l1.rel[end] <= TOL
+        @test sol_l2.rel[end] <= TOL
+        @test sol_l1.objrel[end] <= TOL
+        @test sol_l2.objrel[end] <= TOL
+    end
+
+    @testset "Proximal batch l1 l2" begin
+        model = Problem(A, y, x0, f_reg, λ; out_fn=Mfunc)
+        sol_l1 = iterate!(ProxGGNSCORE(), model, "l1", PHuberSmootherL1L2(μ))
+        sol_l2 = iterate!(ProxGGNSCORE(), model, "l2", PHuberSmootherL1L2(μ))
+        @test model.x ≈ zeros(2)
+        @test sol_l1.epochs+1 ≥ 1
+        @test sol_l2.epochs+1 ≥ 1
+        @test sol_l1.rel[end] <= TOL
+        @test sol_l2.rel[end] <= TOL
+        @test sol_l1.objrel[end] <= TOL
+        @test sol_l2.objrel[end] <= TOL
+    end
+
+    @testset "Proximal slice_samples l1 l2" begin
+        model = Problem(A, y, x0, f_reg, λ; out_fn=Mfunc)
+        sol_l1 = iterate!(ProxGGNSCORE(), model, "l1", PHuberSmootherL1L2(μ))
+        sol_l2 = iterate!(ProxGGNSCORE(), model, "l2", PHuberSmootherL1L2(μ))
+        @test model.x ≈ zeros(2)
+        @test sol_l1.epochs+1 ≥ 1
+        @test sol_l2.epochs+1 ≥ 1
         @test sol_l1.rel[end] <= TOL
         @test sol_l2.rel[end] <= TOL
         @test sol_l1.objrel[end] <= TOL
@@ -68,7 +94,7 @@ end
     @testset "PHuber indbox" begin
         model = Problem(A, y, x0, f_qp, λ; C_set=[lb, ub], sol=x_star)
         sol_p = iterate!(ProxNSCORE(), model, "indbox", PHuberSmootherIndBox(lb, ub, μ), α=0.8)
-        @test sol_p.iters+1 > 1
+        @test sol_p.epochs+1 ≥ 1
         @test sol_p.rel[end] <= TOL
         @test sol_p.objrel[end] <= TOL
     end
@@ -76,7 +102,7 @@ end
     @testset "Exp indbox" begin
         model = Problem(A, y, x0, f_qp, λ; C_set=[lb, ub], sol=x_star)
         sol_e = iterate!(ProxNSCORE(), model, "indbox", ExponentialSmootherIndBox(lb, ub, μ), α=0.8)
-        @test sol_e.iters+1 > 1
+        @test sol_e.epochs+1 ≥ 1
         @test sol_e.rel[end] <= TOL
         @test sol_e.objrel[end] <= TOL
     end

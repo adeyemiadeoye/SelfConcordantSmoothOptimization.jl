@@ -156,6 +156,11 @@ function iterate!(method::ProximalMethod, model::ProxModel, reg_name, hμ; metri
                     Δtime = (now() - t0).value/1000
                     fval = f(x)
                     obj = fval + get_reg(model, x, reg_name)
+                    if reg_name == "gl"
+                        rel_error = mean_square_error(x_star, x)
+                    else
+                        rel_error = max(norm(x - x_star) / max.(norm(x_star),1), x_tol)
+                    end
                     print("\n"*l_split)
                     @eval(@showval("Optimizer", $method.label))
                     if test_model
@@ -189,6 +194,11 @@ function iterate!(method::ProximalMethod, model::ProxModel, reg_name, hμ; metri
                     Δtime = (now() - t0).value/1000
                     fval = f(x)
                     obj = fval + get_reg(model, x, reg_name)
+                    if reg_name == "gl"
+                        rel_error = mean_square_error(x_star, x)
+                    else
+                        rel_error = max(norm(x - x_star) / max.(norm(x_star),1), x_tol)
+                    end
                     if verbose > 2
                         print("\n"*l_split)
                         @eval(@showval("Optimizer", $method.label))
@@ -219,7 +229,6 @@ function iterate!(method::ProximalMethod, model::ProxModel, reg_name, hμ; metri
                     push!(f_rel_errors, f_rel_error)
                     push!(times, Δtime)
                 end
-                break
             end
             x_prev = deepcopy(x)
             x = x_new

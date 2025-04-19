@@ -1,5 +1,5 @@
 struct scaled_proximal_l1{D,T,A,S}
-    model::ProxModel
+    model::SCMOModel
     x::D
     h_scale::T
     λ::A
@@ -12,7 +12,7 @@ function prox_step(proxh::scaled_proximal_l1)
 end
 
 struct scaled_proximal_l2{D,T,A,S}
-    model::ProxModel
+    model::SCMOModel
     x::D
     h_scale::T
     λ::A
@@ -25,7 +25,7 @@ function prox_step(proxh::scaled_proximal_l2)
 end
 
 struct scaled_proximal_indbox{D,T,A,S}
-    model::ProxModel
+    model::SCMOModel
     x::D
     h_scale::T
     λ::A
@@ -34,7 +34,11 @@ end
 function prox_step(proxh::scaled_proximal_indbox)
     (; model, x, h_scale, λ, α) = proxh
     if is_interval_set(model.C_set)
-        lb, ub = minimum(model.C_set), maximum(model.C_set)
+        if isa(model.C_set, Tuple)
+            lb, ub = [minimum.(model.C_set)...], [maximum.(model.C_set)...]
+        else
+            lb, ub = minimum(model.C_set), maximum(model.C_set)
+        end
     else
         lb, ub = model.C_set[1], model.C_set[2]
     end
@@ -42,7 +46,7 @@ function prox_step(proxh::scaled_proximal_indbox)
 end
 
 struct scaled_proximal_grouplasso{D,T,A,S}
-    model::ProxModel
+    model::SCMOModel
     x::D
     h_scale::T
     λ::A
@@ -50,8 +54,7 @@ struct scaled_proximal_grouplasso{D,T,A,S}
 end
 function prox_step(proxh::scaled_proximal_grouplasso)
     (; model, x, h_scale, λ, α) = proxh
-    # the value of λ that this function takes is typically 1.0,
-    # so we ignore this and get the true value from the model
+    # get the true value of λ from the model
     P = model.P
     λ1, λ2 = model.λ[1], model.λ[2]
     t = λ1 ./ h_scale
@@ -59,19 +62,10 @@ function prox_step(proxh::scaled_proximal_grouplasso)
     utmp = sign.(x) .* max.(abs.(x) .- t, 0) # ProxL1
     u = P.ProxL2(utmp, α*λ2, h_scale) # ProxL2
 
-    #### Alternatively:
-    # Prox_L1
-    # utmp = max.(0, x .- t) .- max.(0, -x .- t)
-    # u = P.times(utmp)
-
-    # # Proj_L2
-    # u = P.ProjL2(u, α*λ2, h_scale)
-    # u = utmp - P.trans(u)
-
     return u
 end
 
-function invoke_prox(model::ProxModel, reg_name::String, x, h, λ, α)
+function invoke_prox(model::SCMOModel, reg_name::String, x, h, λ, α)
     if reg_name == "l1"
         return scaled_proximal_l1(model, x, h, λ, α)
     elseif reg_name == "l2"

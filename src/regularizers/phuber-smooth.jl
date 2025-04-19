@@ -4,6 +4,19 @@ const huber_smooth_Mh = 2.0
 const huber_smooth_ν = 2.6
 
 mutable struct PHuberSmootherL1L2 <: Smoother
+    """
+    PHuberSmootherL1L2
+
+    Smoother for pseudo-Huber approximation of the l1/l2 regularizer.
+
+    # Fields
+    - `μ`: Smoothing parameter
+    - `Mh`: Smoothness constant
+    - `ν`: Self-concordance parameter
+    - `val`: Value function (smoothed regularizer)
+    - `grad`: Gradient function
+    - `hess`: Hessian function
+    """
     μ
     Mh
     ν
@@ -23,6 +36,19 @@ function huber_hess(x; μ=1.0, λ=1.0) # returns a vector, the diagonal part of 
 end
 
 mutable struct PHuberSmootherIndBox <: Smoother
+    """
+    PHuberSmootherIndBox
+
+    Smoother for pseudo-Huber approximation of the indicator box regularizer.
+
+    # Fields
+    - `μ`: Self-concordance/Smoothing parameter
+    - `Mh`: Self-concordance constant
+    - `ν`: Self-concordance parameter
+    - `val`: Value function (smoothed regularizer)
+    - `grad`: Gradient function
+    - `hess`: Hessian function
+    """
     μ
     Mh
     ν
@@ -88,6 +114,19 @@ function huber_hess_indbox(x; μ=1.0,lb=0.0,ub=1.0) # returns a vector, the diag
 end
 
 mutable struct PHuberSmootherGL <: Smoother
+    """
+    PHuberSmootherGL
+
+    Smoother for pseudo-Huber approximation of the group lasso regularizer.
+
+    # Fields
+    - `μ`: Smoothing parameter
+    - `Mh`: Smoothness constant
+    - `ν`: Self-concordance parameter
+    - `val`: Value function (smoothed regularizer)
+    - `grad`: Gradient function
+    - `hess`: Hessian function
+    """
     μ
     Mh
     ν
@@ -133,7 +172,7 @@ function infconvHuberNorm(x::Vector{Float64}, λ::IntOrFloat, inds::Matrix{Int},
         λw = λ * ind[2+3*(j-1)+1]
         kstart = Int(ind[3*(j-1)+1])
         kend = Int(ind[1+3*(j-1)+1])
-        nrm = normfun(x, kstart, kend)
+        nrm = twonorm(x, kstart, kend)
 
         for k in kstart:kend
             ICz[k] = x[k] * max(1 - λw / nrm, 0)

@@ -4,6 +4,17 @@ export ProxNSCORE
 
 # A Proximal Newton method
 Base.@kwdef mutable struct ProxNSCORE <: ProximalMethod
+    """
+    ProxNSCORE
+
+    Proximal Newton method with self-concordant regularization.
+
+    # Fields
+    - `ss_type`: Step size type (1: fixed, 2: Barzilai-Borwein, 3: line search)
+    - `use_prox`: Whether to use the proximal step
+    - `name`: Algorithm name
+    - `label`: Human-readable label
+    """
     ss_type::Int = 1
     use_prox::Bool = true
     name::String = "prox-newtonscore"
@@ -14,13 +25,13 @@ function set_name!(method::ProxNSCORE, implemented_algs)
     if method.use_prox == false
         method.name = "newtonscore"
         method.label = "Newton-SCORE"
-        push!(implemented_algs, "newtonscore")
+        push!(implemented_algs, method.name)
     else
         push!(implemented_algs, method.name)
     end
     return method
 end
-function step!(method::ProxNSCORE, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
+function step!(method::ProxNSCORE, model::OptimModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
     if length(model.λ) > 1
         λ = model.λ[1]
     else
@@ -52,7 +63,7 @@ function step!(method::ProxNSCORE, model::ProxModel, reg_name, hμ, As, x, x_pre
         else
             λgr_prev = λ .* hμ.grad(x_prev)
             ∇f_prev = grad_f(x_prev) + λgr_prev
-            step_size = inv_BB_step(x, x_prev, ∇f, ∇f_prev) # inverse of the original BB step-size
+            step_size = inv_BB_step(x, x_prev, ∇f, ∇f_prev) # BB step-size
         end
     elseif method.ss_type == 3
         step_size = linesearch(x, d, obj, grad_f)

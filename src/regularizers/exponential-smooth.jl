@@ -1,6 +1,19 @@
 # Exponential smoothing function
 
 mutable struct ExponentialSmootherIndBox <: Smoother
+    """
+    ExponentialSmootherIndBox
+
+    Smoother for exponential approximation of the indicator box regularizer.
+
+    # Fields
+    - `μ`: Self-concordance/Smoothing parameter
+    - `Mh`: Self-concordance constant
+    - `ν`: Self-concordance parameter
+    - `val`: Value function (smoothed regularizer)
+    - `grad`: Gradient function
+    - `hess`: Hessian function
+    """
     μ
     Mh
     ν
@@ -23,12 +36,12 @@ end
 function exp_smooth_indbox(x; μ=1.0, lb=0.0, ub=1.0)
     n = size(x,1)
     a, b = bounds_sanity_check(n, lb, ub)
-    return @. exp((-x + a) / μ) * μ
+    return @. exp((-x + a)/μ) * μ
 end
 function exp_smooth_grad_indbox(x; μ=1.0, lb=0.0, ub=1.0)
     n = size(x,1)
     a, b = bounds_sanity_check(n, lb, ub)
-    return @. -exp((-x + a) / μ)
+    return @. -exp((-x + a)/μ)
 end
 function exp_smooth_hess_indbox(x; μ=1.0, lb=0.0, ub=1.0) # returns a vector, the diagonal part of exp_smooth_hess_l2 (a diagonal matrix)
     n = size(x,1)

@@ -4,6 +4,17 @@ export ProxGGNSCORE
 
 # A Proximal GGN method
 Base.@kwdef mutable struct ProxGGNSCORE <: ProximalMethod
+    """
+    ProxGGNSCORE
+
+    Proximal Generalized Gauss-Newton (GGN) method with self-concordant regularization.
+
+    # Fields
+    - `ss_type`: Step size type (1: fixed, 2: Barzilai-Borwein, 3: line search)
+    - `use_prox`: Whether to use the proximal step
+    - `name`: Algorithm name
+    - `label`: Human-readable label
+    """
     ss_type::Int = 1
     use_prox::Bool = true
     name::String = "prox-ggnscore"
@@ -14,13 +25,13 @@ function set_name!(method::ProxGGNSCORE, implemented_algs)
     if method.use_prox == false
         method.name = "ggnscore"
         method.label = "GGN-SCORE"
-        push!(implemented_algs, "ggnscore")
+        push!(implemented_algs, method.name)
     else
         push!(implemented_algs, method.name)
     end
     return method
 end
-function step!(method::ProxGGNSCORE, model::ProxModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
+function step!(method::ProxGGNSCORE, model::OptimModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
     obj = x -> model.f(As, ys, x) + get_reg(model, x, reg_name)
     if length(model.λ) > 1
         λ = model.λ[1]
@@ -54,7 +65,7 @@ function step!(method::ProxGGNSCORE, model::ProxModel, reg_name, hμ, As, x, x_p
     Hdiag_inv = 1 ./ Hr_diag
     H_inv = Diagonal(Hdiag_inv)
 
-    d = ggn_score_step(J, Q, [gr], Hr_diag, H_inv, residual, λ, size(ys,2))
+    d = ggn_score_step(J, Q, [gr], Hr_diag, H_inv, residual, λ)
 
     if method.ss_type == 1 && model.L !==nothing
         step_size = min(1/model.L,1.0)
@@ -66,7 +77,7 @@ function step!(method::ProxGGNSCORE, model::ProxModel, reg_name, hμ, As, x, x_p
         else
             λgr_prev = λ .* hμ.grad(x_prev)
             ∇f_prev = grad_f(x_prev) + λgr_prev
-            step_size = inv_BB_step(x, x_prev, ∇f, ∇f_prev) # inverse of the original BB step-size
+            step_size = inv_BB_step(x, x_prev, ∇f, ∇f_prev) # BB step-size
         end
     elseif method.ss_type == 3
         step_size = linesearch(x, d, obj, grad_f)
@@ -93,7 +104,7 @@ function step!(method::ProxGGNSCORE, model::ProxModel, reg_name, hμ, As, x, x_p
     return x_new
 end
 
-function ggn_score_step(J::Union{SparseMatrixCSC{Float64, Int64},Matrix{Float64}}, Q::Union{Matrix{Float64}, Diagonal{Float64, Vector{Float64}}}, gr::Vector{Vector{Float64}}, Hr_diag::Vector{Float64}, H_inv::Diagonal{Float64,Vector{Float64}}, residual::VectorBitVectorOrArray2{Float64}, λ::IntOrFloat, ydm2::Int64)
+function ggn_score_step(J::Union{SparseMatrixCSC{Float64, Int64},Matrix{Float64}}, Q::Union{Matrix{Float64}, Diagonal{Float64, Vector{Float64}}}, gr::Vector{Vector{Float64}}, Hr_diag::Vector{Float64}, H_inv::Diagonal{Float64,Vector{Float64}}, residual::VectorBitVectorOrArray2{Float64}, λ::IntOrFloat)
     n = length(gr[1])
 
     # Jacobian "concatenations"

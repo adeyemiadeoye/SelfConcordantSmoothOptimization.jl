@@ -6,8 +6,8 @@
     μ = 1
     lb = -1.0
     ub = 1.0
-    f_reg(A, y, x) = 1/2*sum(log.(1 .+ exp.(-y .* (A*x))))
-    f_reg(y, yhat) = -1/2*sum(y .* log.(yhat) .+ (1 .- y) .* log.(1 .- yhat))
+    f_reg(A, y, x) = 1/5*sum(log.(1 .+ exp.(-y .* (A*x))))
+    f_reg(y, yhat) = -1/5*sum(y .* log.(yhat) .+ (1 .- y) .* log.(1 .- yhat))
     Mfunc(A, x) = vcat([1 ./ (1 .+ exp.(-A*x))]...)
 
     TOL = 1e-6
@@ -87,7 +87,7 @@ end
     μ = 0.6
     lb = -1.0
     ub = 1.0
-    f_qp(A, y, x) = 0.5*(x' * (A *x)) + (y'*x)
+    f_qp(A, y, x) = 1/2*(x' * (A *x)) + (y'*x)
 
     TOL = 1e-3
 
@@ -101,7 +101,7 @@ end
 
     @testset "Exp indbox" begin
         model = Problem(A, y, x0, f_qp, λ; C_set=[lb, ub], sol=x_star)
-        sol_e = iterate!(ProxNSCORE(), model, "indbox", ExponentialSmootherIndBox(lb, ub, μ), α=0.8)
+        sol_e = iterate!(ProxNSCORE(), model, "indbox", ExponentialSmootherIndBox(lb, ub, μ), α=1.0)
         @test sol_e.epochs+1 ≥ 1
         @test sol_e.rel[end] <= TOL
         @test sol_e.objrel[end] <= TOL

@@ -1,7 +1,3 @@
-export Smoother
-
-abstract type Smoother end
-
 # No smoothing
 mutable struct NoSmooth <: Smoother
     μ

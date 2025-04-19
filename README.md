@@ -10,6 +10,7 @@
 </p>
 
 - [SelfConcordantSmoothOptimization.jl](#selfconcordantsmoothoptimizationjl)
+  - [Python/JAX port](#pythonjax-port)
   - [Installation](#installation)
   - [Usage example](#usage-example)
       - [A simple sparse logistic regression problem](#a-simple-sparse-logistic-regression-problem)
@@ -26,6 +27,9 @@ minimize f(x) + g(x)
 
 where $\mathrm{f}\colon \mathbb{R}^n \to \mathbb{R}$ is smooth and convex, and $\mathrm{g}\colon \mathbb{R}^n \to \mathbb{R}$, which may be nonsmooth, is proper, closed and convex. The smooth part $\mathrm{f}$ defines the problem's objective function, such as quantifying a data-misfit, while the nonsmooth part $\mathrm{g}$ imposes certain properties, such as sparsity, on the decision variable $\mathrm{x}$. Please see [Implementation details and recommendations](#implementation-details-and-recommendations) for functions that are currently supported for each implemented algorithm.
 
+## Python/JAX port
+A Python/JAX port of most parts of this package is available at [PySCSOpt](https://github.com/adeyemiadeoye/PySCSOpt).
+
 ## Installation
 Install the package via Julia's `REPL` with
 ```julia
@@ -35,6 +39,7 @@ Pkg.add("SelfConcordantSmoothOptimization")
 ```
 
 ## Usage example
+For more numerical examples including training `Flux.jl`'s neural network models and federated learning/optimization with `Flux.jl`, see the [SCSO-numerical-tests](https://github.com/adeyemiadeoye/SCSO-numerical-tests) repository.
 #### A simple sparse logistic regression problem
 ```julia
 # Load the package
@@ -141,13 +146,13 @@ Below is a summary of functions $\mathrm{f}$ supported by the algorithms impleme
 |----------------	|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------	|
 | `ProxNSCORE`   	| <li>Any twice continuously differentiable function.</li>                                                                                                                                                                                        		|
 | `ProxGGNSCORE` 	| <li>Any twice continuously differentiable function that can be expressed in the form $f(x) =  \sum\limits_{i=1}^{m}\ell(y_i,\hat{y}_i)$ where $\ell$ is a loss function that measures a data-misfit.</li> <li>Requires a model $\mathcal{M}(A,x)$ that computes the predictions $\hat{y}_i$.</li> 		|
-| `ProxQNSCORE`  	| <li>Any twice continuously differentiable function (currently not recommended).</li> <li>Currently not recommended.</li>                                                                                                                                                                                       		|
+| `ProxQNSCORE`  	| <li>Any twice continuously differentiable function.</li> <li>Since we generally do not recommended this method, the Python/JAX port ([PySCSOpt](https://github.com/adeyemiadeoye/PySCSOpt)) implements a limited-memory version of it (`ProxLQNSCORE`) that is very efficient for large-scale problems.</li>                                                                                                                                                                                       		|
 
 
 ### Optional arguments
 | Arg      	| Description & usage                                                                                                                                                                                                                                 |
 |----------------	|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------	|
-| `ss_type`   	| <li>Value `1` and with a given `L` in `Problem` sets $\mathrm{\alpha}=\min\{1/L, 1\}$.</li> <li>Value `1` without setting `L` in `Problem` sets $\mathrm{\alpha}$ to the value in `iterate!` (or a default value $0.5$ if not set).</li> <li>Value `2` uses the "inverse" of Barzilai-Borwein method to set $\mathrm{\alpha}$ (Not recommended).</li> <li>Value `3` uses a line-search method to choose $\mathrm{\alpha}$.</li> <li>Default value: `1`.</li> <li>e.g. `method = ProxGGNSCORE(ss_type=1)`</li>                                                                                                                                                                                       		|
+| `ss_type`   	| <li>Value `1` and with a given `L` in `Problem` sets $\mathrm{\alpha}=\min\{1/L, 1\}$.</li> <li>Value `1` without setting `L` in `Problem` sets $\mathrm{\alpha}$ to the value in `iterate!` (or a default value $0.5$ if not set).</li> <li>Value `2` uses the "inverse" of Barzilai-Borwein method to set $\mathrm{\alpha}$.</li> <li>Value `3` uses a line-search method to choose $\mathrm{\alpha}$.</li> <li>Default value: `1`.</li> <li>e.g. `method = ProxGGNSCORE(ss_type=2)`</li>                                                                                                                                                                                       		|
 | `use_prox` 	| <li>Value `true` uses the proximal scheme as described in the paper.</li> <li>Value `false` skips the proximal step and takes only the associated Newton-type/gradient-based step.</li> <li>Default value: `true`.</li> <li>e.g. `method = ProxGGNSCORE(use_prox=true)`</li>                                                                                                                                                                                       		|
 
 As the package name and description imply, the implemented algorithms use a generalized self-concordant smooth approximation $\mathrm{g_s}$ of $\mathrm{g}$ in their procedures. The algorithms do this for specific regularization functions that are specified by `reg_name` that takes a string value in the `iterate!` function. We summarize below currently implemented regularization functions, as well as the corresponding smoothing functions $\mathrm{g_s}$.
@@ -157,15 +162,15 @@ As the package name and description imply, the implemented algorithms use a gene
 | `"l1"`           	| <li>`PHuberSmootherL1L2(μ)`</li> <li>`OsBaSmootherL1L2(μ)`</li>	| $\mathrm{\mu}>0$                                                                                             	|
 | `"l2"`           	| <li>`PHuberSmootherL1L2(μ)`</li> <li>`OsBaSmootherL1L2(μ)`</li>                                                                       	| $\mathrm{\mu}>0$                                                                                             	|
 | `"gl"`       	| <li>`PHuberSmootherGL(μ, model)`</li>                                                                          	| For sparse group lasso regularizer <br> $\mathrm{\mu}>0$ 	|
-| `"indbox"`       	| <li>`ExponentialSmootherIndBox(lb,ub,μ)`</li> <li>`PHuberSmootherIndBox(lb,ub,μ)`</li>                                                                          	| `lb`: lower bound in the box constraints <br> `ub`: upper bound in the box constraints <br> $\mathrm{\mu}>0$ 	|
+| `"indbox"`       	| <li>`LogExpSmootherIndBox(lb,ub,μ)`</li><li>`ExponentialSmootherIndBox(lb,ub,μ)`</li> <li>`PHuberSmootherIndBox(lb,ub,μ)`</li>                                                                          	| `lb`: lower bound <br> `ub`: upper bound <br> $\mathrm{\mu}>0$ 	|
 
 > [!NOTE]
-> `PHuberSmootherL1L2`, `PHuberSmootherGL`, `ExponentialSmootherIndBox` are recommended.
+> Use `PHuberSmootherL1L2`, `PHuberSmootherGL` and `LogExpSmootherIndBox`.
 
 For more details and insights on the approach implemented in this package, please see the associated paper in [Citing](#citing) below.
 
 ## Citing
-If you use `SelfConcordantSmoothOptimization.jl` in your work, particularly the algorithms listed above, we kindly request that you cite the following paper:
+If you use `SelfConcordantSmoothOptimization.jl` in your research, we kindly request that you cite the following paper:
 ```
 @article{adeoye2023self,
   title={Self-concordant Smoothing for Large-Scale Convex Composite Optimization},

@@ -4,6 +4,19 @@ const osba_smooth_Mh = 2*sqrt(2)
 const osba_smooth_ν = 3.0
 
 mutable struct OsBaSmootherL1L2 <: Smoother
+    """
+    OsBaSmootherL1L2
+
+    Smoother for Ostrovskii & Bach approximation of the l1/l2 regularizer.
+
+    # Fields
+    - `μ`: Self-concordance/Smoothing parameter
+    - `Mh`: Self-concordance constant
+    - `ν`: Self-concordance parameter
+    - `val`: Value function (smoothed regularizer)
+    - `grad`: Gradient function
+    - `hess`: Hessian function
+    """
     μ
     Mh
     ν
@@ -23,6 +36,19 @@ function osba_smooth_hess_l1(x; μ=1.0, λ=1.0) # returns a vector, the diagonal
 end
 
 mutable struct OsBaSmootherGL <: Smoother
+    """
+    OsBaSmootherGL
+
+    Smoother for Ostrovskii & Bach approximation of the group lasso regularizer.
+
+    # Fields
+    - `μ`: Smoothing parameter
+    - `Mh`: Smoothness constant
+    - `ν`: Self-concordance parameter
+    - `val`: Value function (smoothed regularizer)
+    - `grad`: Gradient function
+    - `hess`: Hessian function
+    """
     μ
     Mh
     ν

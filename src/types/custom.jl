@@ -1,5 +1,4 @@
 using IntervalSets
-using Flux, Lux, NeuralOperators
 
 export OptimModel
 export IntegerOrNothing
@@ -17,7 +16,7 @@ const DataTupleOrArray2 = Union{Tuple{Matrix{T}, Matrix{T}}, Array2} where {T<:R
 const VectorOrNothing = Union{Vector{T}, Nothing} where {T<:Real}
 const StringOrNothing = Union{String, Nothing}
 const FuncOrNothing = Union{Function, Nothing}
-const FuncNNOrNothing = Union{FuncOrNothing, Flux.Chain, AbstractLuxLayer}
+const FuncNNOrNothing = Union{FuncOrNothing}
 const IntegerOrNothing = Union{Integer, Nothing}
 const VectorOrBitVector{T} = Union{BitVector, Vector{T}}
 const VectorBitVectorOrArray2{T} = Union{BitVector, Vector{T}, Matrix{T}}

@@ -104,16 +104,6 @@ function optim_loop!(method::ProximalMethod, model::OptimModel, reg_name, hμ; o
     if typeof(model) <: ProxModel
         m = size(model.y,1)
         ny = size(model.y,2)
-        if typeof(model.out_fn) <: Flux.Chain
-            set_out_fn!(model)
-        elseif typeof(model.out_fn) <: AbstractLuxLayer
-            m = size(model.y,2)
-            ny = size(model.y,1)
-            x_data = model.A[2]
-            model_out_fn = deepcopy(model.out_fn)
-            model.x0 = nothing
-            set_lux_out_fn!(model)
-        end
     end
     max_epoch = opt.max_epoch
     x_tol = opt.x_tol
@@ -140,13 +130,8 @@ function optim_loop!(method::ProximalMethod, model::OptimModel, reg_name, hμ; o
             opt.slice_samples = false # a.k.a prioritize mini-batching
         end
 
-        if typeof(model_out_fn) <: AbstractLuxLayer
-            features = Matrix(model.A[1]')
-            targets = Matrix(model.y')
-        else
-            features = model.A
-            targets = model.y
-        end
+        features = model.A
+        targets = model.y
 
         if opt.slice_samples
             data = slice_data(features, targets)
@@ -219,11 +204,7 @@ function optim_loop!(method::ProximalMethod, model::OptimModel, reg_name, hμ; o
         for (i, sample) in enumerate(data)
             if typeof(model) <: ProxModel
                 As, ys = sample
-                if typeof(model_out_fn) <: AbstractLuxLayer
-                    (As, ys) = ((As, x_data), ys)
-                else
-                    (As, ys) = ny == 1 ? (Matrix(As'), vec(ys')) : (Matrix(As'), Matrix(ys'))
-                end
+                (As, ys) = ny == 1 ? (Matrix(As'), vec(ys')) : (Matrix(As'), Matrix(ys'))
             else
                 As, ys = nothing, nothing
             end

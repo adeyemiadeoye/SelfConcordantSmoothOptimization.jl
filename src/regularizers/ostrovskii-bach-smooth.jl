@@ -24,7 +24,7 @@ mutable struct OsBaSmootherL1L2 <: Smoother
     grad
     hess
 end
-OsBaSmootherL1L2(mu::IntOrFloat; val=x->osba_smooth_l1.(x;μ=mu), grad=x->osba_smooth_grad_l1.(x;μ=mu), hess=x->osba_smooth_hess_l1.(x;μ=mu)) = OsBaSmootherL1L2(mu, osba_smooth_Mh, osba_smooth_ν, val, grad, hess)
+OsBaSmootherL1L2(mu::IntOrFloat; val=x->osba_smooth_l1.(x;μ=mu), grad=(Cmat,x)->osba_smooth_grad_l1.(x;μ=mu), hess=(Cmat,x)->osba_smooth_hess_l1.(x;μ=mu)) = OsBaSmootherL1L2(mu, osba_smooth_Mh, osba_smooth_ν, val, grad, hess)
 function osba_smooth_l1(x; μ=1.0, λ=1.0)
     return λ*(sqrt(μ^2 + 4*x^2)/2 - μ/2 + μ*log((2*x - sqrt(μ^2 + 4*x^2) + μ)/x)/2 - log(2)*μ + μ*log((sqrt(μ^2 + 4*x^2) - μ + 2*x)/x)/2)
 end

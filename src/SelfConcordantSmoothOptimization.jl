@@ -9,10 +9,11 @@ export OsBaSmootherL1L2, OsBaSmootherGL
 export LogExpSmootherIndBox, LogExpSmootherIndBox2, ExponentialSmootherIndBox
 export get_fed_dataset
 
-using LinearAlgebra
+using LinearAlgebra, LinearSolve
 using MLUtils
 using ForwardDiff: gradient, hessian, jacobian
 using Dates
+using ComponentArrays
 
 include("types/abstract.jl")
 include("types/custom.jl")
@@ -32,6 +33,6 @@ include("algorithms/iterate.jl")
 include("algorithms/federated/fed-iterate.jl")
 include("algorithms/prox-N-SCORE.jl")
 include("algorithms/prox-GGN-SCORE.jl")
-include("algorithms/prox-BFGS-SCORE.jl")
+include("algorithms/prox-L-BFGS-SCORE.jl")
 
 end

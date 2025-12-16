@@ -1,5 +1,5 @@
 using IntervalSets
-using Flux
+using Flux, Lux, NeuralOperators
 
 export OptimModel
 export IntegerOrNothing
@@ -11,11 +11,13 @@ export VectorOrNothing
 export is_interval_set
 
 const OptimModel = Union{ModelGeneric, ProxModel}
-const OperatorOrArray2 = Union{Function, AbstractArray{T,2}} where {T<:Real}
+const Array2 = Union{AbstractArray{T,2}, Matrix{T}} where {T<:Real}
+const OperatorOrArray2 = Union{Function, Array2} where {T<:Real}
+const DataTupleOrArray2 = Union{Tuple{Matrix{T}, Matrix{T}}, Array2} where {T<:Real}
 const VectorOrNothing = Union{Vector{T}, Nothing} where {T<:Real}
 const StringOrNothing = Union{String, Nothing}
 const FuncOrNothing = Union{Function, Nothing}
-const FuncChainOrNothing = Union{FuncOrNothing, Chain}
+const FuncNNOrNothing = Union{FuncOrNothing, Flux.Chain, AbstractLuxLayer}
 const IntegerOrNothing = Union{Integer, Nothing}
 const VectorOrBitVector{T} = Union{BitVector, Vector{T}}
 const VectorBitVectorOrArray2{T} = Union{BitVector, Vector{T}, Matrix{T}}

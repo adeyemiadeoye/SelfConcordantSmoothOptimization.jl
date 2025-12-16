@@ -38,10 +38,10 @@
         @test sol_l2.objrel[end] <= TOL
     end
 
-    @testset "Proximal BFGS SCORE l1 l2" begin
+    @testset "Proximal L-BFGS SCORE l1 l2" begin
         model = Problem(A, y, x0, f_reg, λ)
-        sol_l1 = iterate!(ProxQNSCORE(), model, "l1", PHuberSmootherL1L2(μ))
-        sol_l2 = iterate!(ProxQNSCORE(), model, "l2", PHuberSmootherL1L2(μ))
+        sol_l1 = iterate!(ProxLQNSCORE(), model, "l1", PHuberSmootherL1L2(μ))
+        sol_l2 = iterate!(ProxLQNSCORE(), model, "l2", PHuberSmootherL1L2(μ))
         @test model.x == zeros(2)
         @test sol_l1.epochs+1 ≥ 1
         @test sol_l2.epochs+1 ≥ 1

@@ -31,7 +31,7 @@ function set_name!(method::ProxNSCORE, implemented_algs)
     end
     return method
 end
-function step!(method::ProxNSCORE, model::OptimModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
+function step!(method::ProxNSCORE, model::OptimModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter; ∇fx=nothing, return_dx=false)
     if length(model.λ) > 1
         λ = model.λ[1]
     else
@@ -41,17 +41,35 @@ function step!(method::ProxNSCORE, model::OptimModel, reg_name, hμ, As, x, x_pr
     λgr = λ .* gr
     Hr_diag = hμ.hess(Cmat,x)
     λHr = λ .* Diagonal(Hr_diag)
-    obj = x -> model.f(As, ys, x) + get_reg(model, x, reg_name)
-    if all(x->x!==nothing,(model.grad_fx, model.hess_fx))
-        H = model.hess_fx(As, ys, x)
-        grad_f = x -> model.grad_fx(As, ys, x)
+    if typeof(model) <: ModelGeneric
+        obj = x -> model.f(x) + get_reg(model, x, reg_name)
     else
-        f = x -> model.f(As, ys, x)
+        obj = x -> model.f(As, ys, x) + get_reg(model, x, reg_name)
+    end
+    if all(x->x!==nothing,(model.grad_fx, model.hess_fx))
+        if typeof(model) <: ModelGeneric
+            grad_f = x -> model.grad_fx(x)
+            H = model.hess_fx(x)
+        else
+            grad_f = x -> model.grad_fx(As, ys, x)
+            H = model.hess_fx(As, ys, x)
+        end
+    else
+        if typeof(model) <: ModelGeneric
+            f = x -> model.f(x)
+        else
+            f = x -> model.f(As, ys, x)
+        end
         H = hessian(f, x)
         grad_f = x -> gradient(f, x)
     end
-    ∇f = grad_f(x) + λgr
-    d = -(H + λHr) \ ∇f
+    if ∇fx !== nothing
+        grad_f = x -> ∇fx
+    end
+    ∇q = grad_f(x) + λgr
+    lin_prob = LinearProblem(H + λHr, ∇q)
+    sol = solve(lin_prob)
+    d = -sol.u
 
     if method.ss_type == 1 && model.L !==nothing
         step_size = min(1/model.L,1.0)
@@ -66,7 +84,8 @@ function step!(method::ProxNSCORE, model::OptimModel, reg_name, hμ, As, x, x_pr
             step_size = inv_BB_step(x, x_prev, ∇f, ∇f_prev) # BB step-size
         end
     elseif method.ss_type == 3
-        step_size = linesearch(x, d, obj, grad_f)
+        grad_q = (x) -> grad_f(x) + λ.*hμ.grad(Cmat,x)
+        step_size = linesearch(x, d, obj, grad_q)
     else
         Base.error("Please, choose ss_type in [1, 2, 3].")
     end
@@ -83,12 +102,19 @@ function step!(method::ProxNSCORE, model::OptimModel, reg_name, hμ, As, x, x_pr
     # ensure αₖ satisfies the theoretical condition
     # (actually satisfies it for many convex problems)
     safe_α = min(1, α)
+    dx = safe_α*d
     if method.use_prox
-        prox_m = invoke_prox(model, reg_name, x + safe_α*d, Hdiag_inv, λ, step_size)
+        prox_m = invoke_prox(model, reg_name, x + dx, Hdiag_inv, λ, step_size)
         x_new = prox_step(prox_m)
+        pri_res_norm = norm(x_new - x)
     else
-        x_new = x + safe_α*d
+        x_new = x + dx
+        pri_res_norm = norm(dx)
     end
 
-    return x_new
+    if return_dx
+        return x_new, dx, pri_res_norm
+    else
+        return x_new, pri_res_norm
+    end
 end

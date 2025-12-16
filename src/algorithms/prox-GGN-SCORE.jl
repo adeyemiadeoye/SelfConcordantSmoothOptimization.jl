@@ -31,7 +31,7 @@ function set_name!(method::ProxGGNSCORE, implemented_algs)
     end
     return method
 end
-function step!(method::ProxGGNSCORE, model::OptimModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
+function step!(method::ProxGGNSCORE, model::OptimModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter; ∇fx=nothing, return_dx=false)
     obj = x -> model.f(As, ys, x) + get_reg(model, x, reg_name)
     if length(model.λ) > 1
         λ = model.λ[1]
@@ -80,7 +80,8 @@ function step!(method::ProxGGNSCORE, model::OptimModel, reg_name, hμ, As, x, x_
             step_size = inv_BB_step(x, x_prev, ∇f, ∇f_prev) # BB step-size
         end
     elseif method.ss_type == 3
-        step_size = linesearch(x, d, obj, grad_f)
+        grad_q = (x) -> grad_f(x) + λ.*hμ.grad(Cmat,x)
+        step_size = linesearch(x, d, obj, grad_q)
     else
         Base.error("Please, choose ss_type in [1, 2, 3].")
     end
@@ -93,15 +94,21 @@ function step!(method::ProxGGNSCORE, model::OptimModel, reg_name, hμ, As, x, x_
     # ensure αₖ satisfies the theoretical condition
     # (actually satisfies it for many convex problems)
     safe_α = min(1, α)
-    
+    dx = safe_α*d
     if method.use_prox
-        prox_m = invoke_prox(model, reg_name, x + safe_α*d, Hdiag_inv, λ, step_size)
+        prox_m = invoke_prox(model, reg_name, x + dx, Hdiag_inv, λ, step_size)
         x_new = prox_step(prox_m)
+        pri_res_norm = norm(x_new - x)
     else
-        x_new = x + safe_α*d
+        x_new = x + dx
+        pri_res_norm = norm(dx)
     end
 
-    return x_new
+    if return_dx
+        return x_new, dx, pri_res_norm
+    else
+        return x_new, pri_res_norm
+    end
 end
 
 function ggn_score_step(J::Union{SparseMatrixCSC{Float64, Int64},Matrix{Float64}}, Q::Union{Matrix{Float64}, Diagonal{Float64, Vector{Float64}}}, gr::Vector{Vector{Float64}}, Hr_diag::Vector{Float64}, H_inv::Diagonal{Float64,Vector{Float64}}, residual::VectorBitVectorOrArray2{Float64}, λ::IntOrFloat)

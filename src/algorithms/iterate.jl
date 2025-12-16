@@ -21,6 +21,7 @@ struct Solution{A, O, R, R2, D, T, K, M}
     x::A
     obj::O
     fval::O
+    pri_res_norm::O
     fvaltest::O
     rel::R
     objrel::R2
@@ -48,8 +49,8 @@ Base.@kwdef mutable struct Options
     verbose = 1
 end
 
-function iter_step!(method::ProximalMethod, model::OptimModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
-    return step!(method, model, reg_name, hμ, As, x, x_prev, ys, Cmat, iter)
+function iter_step!(method::ProximalMethod, model::OptimModel, reg_name, hμ, As, x, x_prev, ys, Cmat, iter; ∇fx=nothing, return_dx=false)
+    return step!(method, model, reg_name, hμ, As, x, x_prev, ys, Cmat, iter; ∇fx=∇fx, return_dx=return_dx)
 end
 
 function iterate!(method::ProximalMethod, model::SCMOModel, reg_name, hμ; metrics::Union{Dict{A,B},Nothing}=nothing, α=nothing, batch_size=nothing, slice_samples=false, shuffle_batch=true, max_epoch=1000, comm_rounds=100, local_max_iter=nothing, x_tol=1e-10, f_tol=1e-10, verbose=1) where {A,B}
@@ -98,11 +99,20 @@ end
 
 function optim_loop!(method::ProximalMethod, model::OptimModel, reg_name, hμ; opt=Options())
     m, ny = nothing, nothing
+    model_out_fn = nothing
+    x_data = nothing
     if typeof(model) <: ProxModel
         m = size(model.y,1)
         ny = size(model.y,2)
-        if typeof(model.out_fn) <: Chain
+        if typeof(model.out_fn) <: Flux.Chain
             set_out_fn!(model)
+        elseif typeof(model.out_fn) <: AbstractLuxLayer
+            m = size(model.y,2)
+            ny = size(model.y,1)
+            x_data = model.A[2]
+            model_out_fn = deepcopy(model.out_fn)
+            model.x0 = nothing
+            set_lux_out_fn!(model)
         end
     end
     max_epoch = opt.max_epoch
@@ -129,19 +139,29 @@ function optim_loop!(method::ProximalMethod, model::OptimModel, reg_name, hμ; o
             @info "Cannot use both batch_size and slice_samples=true...\nNow setting slice_samples=false..."
             opt.slice_samples = false # a.k.a prioritize mini-batching
         end
+
+        if typeof(model_out_fn) <: AbstractLuxLayer
+            features = Matrix(model.A[1]')
+            targets = Matrix(model.y')
+        else
+            features = model.A
+            targets = model.y
+        end
+
         if opt.slice_samples
-            data = slice_data(model)
+            data = slice_data(features, targets)
             opt.batch_size = 1
         elseif opt.batch_size !== nothing
-            data = get_data_loader((features=model.A, targets=model.y); batchsize=opt.batch_size, shuffle=opt.shuffle_batch)
+            data = get_data_loader((features=features, targets=targets); batchsize=opt.batch_size, shuffle=opt.shuffle_batch)
         else
             opt.batch_size = m
-            data = get_data_loader((features=model.A, targets=model.y); batchsize=opt.batch_size)
+            data = get_data_loader((features=features, targets=targets); batchsize=opt.batch_size)
         end
         data = get_loader_subset(data, 1:iend)
     end
     opt.max_iter = max_iter
     fvals = []
+    pri_res_norms = []
     fvaltests = []
     objs = []
     rel_errors = []
@@ -170,6 +190,7 @@ function optim_loop!(method::ProximalMethod, model::OptimModel, reg_name, hμ; o
             ftest = (x) -> nothing
         end
     end
+    pri_res_norm = nothing
     obj_star = f(x_star) + get_reg(model, x_star, reg_name)
     x = model.x0
     x_prev = deepcopy(x)
@@ -192,13 +213,17 @@ function optim_loop!(method::ProximalMethod, model::OptimModel, reg_name, hμ; o
         end
         
         f_rel_error = max((norm(obj - obj_star))/norm(obj_star), f_tol)
-        show_stat!(opt, model, method, x, test_model, ftest, fvaltests, epoch, obj, fval, rel_error, Δtime, metric_vals, l_split)
-        update_stat!(objs, obj, fvals, fval, rel_errors, rel_error, f_rel_errors, f_rel_error, times, Δtime)
+        show_stat!(opt, model, method, x, test_model, ftest, fvaltests, epoch, obj, fval, pri_res_norm, rel_error, Δtime, metric_vals, l_split)
+        update_stat!(objs, obj, fvals, fval, pri_res_norms, pri_res_norm, rel_errors, rel_error, f_rel_errors, f_rel_error, times, Δtime)
 
         for (i, sample) in enumerate(data)
             if typeof(model) <: ProxModel
                 As, ys = sample
-                (As, ys) = ny == 1 ? (Matrix(As'), vec(ys')) : (Matrix(As'), Matrix(ys'))
+                if typeof(model_out_fn) <: AbstractLuxLayer
+                    (As, ys) = ((As, x_data), ys)
+                else
+                    (As, ys) = ny == 1 ? (Matrix(As'), vec(ys')) : (Matrix(As'), Matrix(ys'))
+                end
             else
                 As, ys = nothing, nothing
             end
@@ -219,32 +244,36 @@ function optim_loop!(method::ProximalMethod, model::OptimModel, reg_name, hμ; o
                 else
                     rel_error = max(norm(x - x_star) / max.(norm(x_star),1), x_tol)
                 end
-                show_stat!(opt, model, method, x, test_model, ftest, fvaltests, epoch_t, obj, fval, rel_error, Δtime, metric_vals, l_split; is_max_epoch=true)
+                show_stat!(opt, model, method, x, test_model, ftest, fvaltests, epoch_t, obj, fval, pri_res_norm, rel_error, Δtime, metric_vals, l_split; is_max_epoch=true)
                 f_rel_error = max((norm(obj - obj_star))/norm(obj_star), f_tol)
-                update_stat!(objs, obj, fvals, fval, rel_errors, rel_error, f_rel_errors, f_rel_error, times, Δtime)
+                update_stat!(objs, obj, fvals, fval, pri_res_norms, pri_res_norm, rel_errors, rel_error, f_rel_errors, f_rel_error, times, Δtime)
             end
 
-            x_new = iter_step!(method, model, reg_name, hμ, As, x, x_prev, ys, Cmat, epoch_t)
-            if norm(x_new - x) < x_tol*max.(norm(x), 1) || f_rel_error ≤ f_tol
+            x_new, pri_res_norm = iter_step!(method, model, reg_name, hμ, As, x, x_prev, ys, Cmat, epoch_t)
+            if norm(x_new - x) < x_tol*max.(norm(x), 1) || f_rel_error ≤ f_tol || pri_res_norm < x_tol
                 if epoch_t != max_epoch
                     Δtime = (now() - t0).value/1000
-                    fval = f(x)
-                    obj = fval + get_reg(model, x, reg_name)
+                    fval = f(x_new)
+                    obj = fval + get_reg(model, x_new, reg_name)
                     if reg_name == "gl"
-                        rel_error = mean_square_error(x_star, x)
+                        rel_error = mean_square_error(x_star, x_new)
                     else
-                        rel_error = max(norm(x - x_star) / max.(norm(x_star),1), x_tol)
+                        rel_error = max(norm(x_new - x_star) / max.(norm(x_star),1), x_tol)
                     end
-                    show_stat!(opt, model, method, x, test_model, ftest, fvaltests, epoch_t, obj, fval, rel_error, Δtime, metric_vals, l_split; is_terminate_epoch=true)
+                    show_stat!(opt, model, method, x_new, test_model, ftest, fvaltests, epoch_t, obj, fval, pri_res_norm, rel_error, Δtime, metric_vals, l_split; is_terminate_epoch=true)
                     f_rel_error = max((norm(obj - obj_star))/norm(obj_star), f_tol)
-                    update_stat!(objs, obj, fvals, fval, rel_errors, rel_error, f_rel_errors, f_rel_error, times, Δtime)
+                    update_stat!(objs, obj, fvals, fval, pri_res_norms, pri_res_norm, rel_errors, rel_error, f_rel_errors, f_rel_error, times, Δtime)
                 end
+                x_prev = deepcopy(x)
+                x = x_new
+                epochs += 1
+                break
             end
             x_prev = deepcopy(x)
             x = x_new
         end
 
-        if norm(x - x_prev) < x_tol*max.(norm(x_prev), 1) || f_rel_error ≤ f_tol
+        if norm(x - x_prev) < x_tol*max.(norm(x_prev), 1) || f_rel_error ≤ f_tol || pri_res_norm < x_tol
             break
         end
 
@@ -253,5 +282,5 @@ function optim_loop!(method::ProximalMethod, model::OptimModel, reg_name, hμ; o
             print("\n"*l_split)
         end
     end
-    return Solution(x, objs, fvals, fvaltests, rel_errors, f_rel_errors, metric_vals, times, epochs, model)
+    return Solution(x, objs, fvals, pri_res_norms, fvaltests, rel_errors, f_rel_errors, metric_vals, times, epochs, model)
 end

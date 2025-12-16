@@ -1,4 +1,4 @@
-using Flux
+using Flux, NeuralOperators, Lux
 export Problem
 
 mutable struct ProblemLike <: ModelLike end
@@ -52,6 +52,7 @@ mutable struct Problem <: ProxModel
     x0                  # initial x
     f                   # smooth part of the objective function
     λ                   # penalty parameter
+    init_seed           # random seed for Lux model initialization
     Atest               # optional test input data
     ytest               # target for test input data
     L                   # gradient's Lipschitz constant or 1/α
@@ -59,6 +60,7 @@ mutable struct Problem <: ProxModel
     C_set               # contains upper and lower bound of a box-constrained QP problem
     P                   # Prox operator Struct for the group lasso regularizer
     out_fn              # model output function (used for the Prox-GGN-SCORE algorithm)
+    out_state           # state for the output function (used for Lux models)
     re                  # restructure function
     grad_fx             # gradient of f wrt x
     hess_fx             # hessian of f wrt x
@@ -137,18 +139,20 @@ function Problem(
 end
 
 function Problem(
-            A::OperatorOrArray2,
+            A::DataTupleOrArray2,
             y::VectorBitVectorOrArray2{<:Real},
             x0::Vector{Float64},
             f::Function,
             λ::IntFloatVectorOrTupleOfTwo;
-            Atest::Union{OperatorOrArray2, Nothing}=nothing,
+            init_seed::Int=1234,
+            Atest::Union{DataTupleOrArray2, Nothing}=nothing,
             ytest::Union{VectorBitVectorOrArray2{<:Real}, Nothing}=nothing,
             Lf::Union{IntOrFloat, Nothing}=nothing,
             sol::Vector{Float64}=zero(x0),
             C_set::IntervalVectorTupleOrNothing=nothing,
             P::Union{Nothing, get_P}=nothing,
-            out_fn::FuncChainOrNothing=nothing,
+            out_fn::FuncNNOrNothing=nothing,
+            out_state::Union{Nothing, NamedTuple}=nothing,
             re::Union{Nothing,Flux.Optimisers.Restructure}=nothing,
             grad_fx::FuncOrNothing=nothing,
             hess_fx::FuncOrNothing=nothing,
@@ -156,12 +160,12 @@ function Problem(
             grad_fy::FuncOrNothing=nothing,
             hess_fy::FuncOrNothing=nothing,
             name::StringOrNothing=nothing)
-    return Problem(A, y, x0, f, λ, Atest, ytest, Lf, sol, C_set, P, out_fn, re, grad_fx, hess_fx, jac_yx, grad_fy, hess_fy, name)
+    return Problem(A, y, x0, f, λ, init_seed, Atest, ytest, Lf, sol, C_set, P, out_fn, out_state, re, grad_fx, hess_fx, jac_yx, grad_fy, hess_fy, name)
 end
 
 function Problem(
     clients_data::Dict{Any, Any},
-    global_model::Chain,
+    global_model::Flux.Chain,
     f::Function,
     λ::IntFloatVectorOrTupleOfTwo;
     x0::Vector{Float64}=Flux.destructure(global_model)[1],
@@ -171,7 +175,7 @@ function Problem(
     sol::Vector{Float64}=zero(x0),
     C_set::IntervalVectorTupleOrNothing=nothing,
     P::Union{Nothing, get_P}=nothing,
-    out_fn::FuncChainOrNothing=global_model,
+    out_fn::FuncNNOrNothing=global_model,
     re::Union{Nothing,Flux.Optimisers.Restructure}=nothing,
     grad_fx::FuncOrNothing=nothing,
     hess_fx::FuncOrNothing=nothing,

@@ -20,7 +20,7 @@ Base.getindex(d::Dataset, i::Int) = (d.features[i, :], d.targets[i])
 const DatasetOrNamedTuple = Union{Dataset, @NamedTuple{features::Matrix{Float64}, targets::Matrix{Float64}}, DataLoader}
 
 mutable struct Client
-    model::Chain
+    model::Flux.Chain
     data::DatasetOrNamedTuple
 end
 

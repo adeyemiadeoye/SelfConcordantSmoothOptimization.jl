@@ -1,4 +1,4 @@
-using StatsBase
+using StatsBase, Random
 
 function mean_square_error(xtrue, xpred)
     return mean(abs2, xtrue - xpred)
@@ -11,8 +11,8 @@ macro showval(name, expression)
     end
 end
 
-function slice_data(model::ProxModel)
-    return zip(eachslice(model.A; dims=1), eachrow(model.y))
+function slice_data(features, targets)
+    return zip(eachslice(features; dims=1), eachrow(targets))
 end
 
 function get_data_loader(data; batchsize=64, shuffle=false)
@@ -34,6 +34,10 @@ function linesearch(x, d, f, grad_f)
     return α
 end
 
+function update_mu(k, factor)
+    return k^factor
+end
+
 # compute inverse of the Barzilai-Borwein step size to estimate alpha in the paper
 ## see https://en.wikipedia.org/wiki/Barzilai-Borwein_method
 function inv_BB_step(x, x_prev, gradx, gradx_prev)
@@ -43,7 +47,7 @@ function inv_BB_step(x, x_prev, gradx, gradx_prev)
     return L_est
 end
 
-function show_stat!(opt, model, method, x, test_model, ftest, fvaltests, epoch, obj, fval, rel_error, Δtime, metric_vals, l_split; is_max_epoch=false, is_terminate_epoch=false)
+function show_stat!(opt, model, method, x, test_model, ftest, fvaltests, epoch, obj, fval, pri_res_norm, rel_error, Δtime, metric_vals, l_split; is_max_epoch=false, is_terminate_epoch=false)
     if opt.verbose > 1
         print("\n"*l_split)
         @eval(@showval("Optimizer", $method.label))
@@ -54,23 +58,23 @@ function show_stat!(opt, model, method, x, test_model, ftest, fvaltests, epoch, 
         if opt.verbose > 1
             if is_max_epoch
                 max_epoch = epoch
-                @show max_epoch obj fval fvaltest rel_error Δtime
+                @show max_epoch obj fval pri_res_norm fvaltest rel_error Δtime
             elseif is_terminate_epoch
                 terminate_epoch = epoch
-                @show terminate_epoch obj fval fvaltest rel_error Δtime
+                @show terminate_epoch obj fval pri_res_norm fvaltest rel_error Δtime
             else
-                @show epoch obj fval fvaltest rel_error Δtime
+                @show epoch obj fval pri_res_norm fvaltest rel_error Δtime
             end
         end
     elseif opt.verbose > 1
         if is_max_epoch
             max_epoch = epoch
-            @show max_epoch obj fval rel_error Δtime
+            @show max_epoch obj fval pri_res_norm rel_error Δtime
         elseif is_terminate_epoch
             terminate_epoch = epoch
-            @show terminate_epoch obj fval rel_error Δtime
+            @show terminate_epoch obj fval pri_res_norm rel_error Δtime
         else
-            @show epoch obj fval rel_error Δtime
+            @show epoch obj fval pri_res_norm rel_error Δtime
         end
     end
     if opt.metrics !== nothing
@@ -140,9 +144,10 @@ function update_show_stat_fed!(opt, SCSO_problem, test_model, get_metrics, metri
 
 end
 
-function update_stat!(objs, obj, fvals, fval, rel_errors, rel_error, f_rel_errors, f_rel_error, times, Δtime)
+function update_stat!(objs, obj, fvals, fval, pri_res_norms, pri_res_norm, rel_errors, rel_error, f_rel_errors, f_rel_error, times, Δtime)
     push!(objs, obj)
     push!(fvals, fval)
+    push!(pri_res_norms, pri_res_norm)
     push!(rel_errors, rel_error)
     push!(f_rel_errors, f_rel_error)
     push!(times, Δtime)
@@ -193,9 +198,73 @@ function set_out_fn!(model)
         return Q
     end
 
+    if model.x0 === nothing
+        model.x0 = x0
+        model.sol = model.sol === nothing ? zero(x0) : model.sol
+    end
+    model.re = re_x
+    model.out_fn = out_fn
+    model.f = loss_fn
+    model.grad_fx = grad_fx
+    model.jac_yx = jac_yx
+    model.grad_fy = grad_fy
+    model.hess_fy = hess_fy
+
+end
+
+
+function set_lux_out_fn!(model)
+
+    nnoperator = deepcopy(model.out_fn)
+
+    ps, st = Lux.setup(Random.default_rng(model.init_seed), nnoperator)
+
+    x0, re_x = Flux.destructure(Lux.f64(ComponentArray(ps)))
+
+    function out_fn(A, x)
+        lux_model = StatefulLuxLayer(nnoperator, re_x(x), st)
+        out = lux_model(A)
+        return out
+    end
+
+    loss_f = deepcopy(model.f)
+
+    loss_fn(out, y) = loss_f(out, y)
+    
+    function loss_fn(A,y,x)
+        lux_model = StatefulLuxLayer(nnoperator, re_x(x), st)
+        out = lux_model(A)
+        return loss_fn(out, y)
+    end
+    
+    function grad_fx(A, y, x)
+        g = gradient((x) -> loss_fn(A, y, x), x)
+        return g
+    end
+    
+    function jac_yx(A, y, out, x)
+        jac = jacobian((x) -> out_fn(A, x), x)
+        return jac
+    end
+    
+    function grad_fy(A, y, out)
+        residual = gradient((out) -> loss_fn(out, y), out)
+        return Matrix(reshape(residual', (size(residual,2), size(residual,1))))
+    end
+    
+    function hess_fy(A, y, out)
+        Q = hessian((out) -> loss_fn(out, y), out)
+        return Q
+    end
+
+    # if model.x0 === nothing
+    #     model.x0 = x0
+    #     model.x = model.x === nothing ? zero(x0) : model.x
+    # end
     model.x0 = x0
     model.re = re_x
     model.out_fn = out_fn
+    model.out_state = st
     model.f = loss_fn
     model.grad_fx = grad_fx
     model.jac_yx = jac_yx

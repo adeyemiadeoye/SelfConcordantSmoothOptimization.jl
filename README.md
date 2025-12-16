@@ -28,7 +28,7 @@
 minimize f(x) + g(x)
 </p>
 
-where $\mathrm{f}\colon \mathbb{R}^n \to \mathbb{R}$ is smooth and convex, and $\mathrm{g}\colon \mathbb{R}^n \to \mathbb{R}$, which may be nonsmooth, is proper, closed and convex. The smooth part $\mathrm{f}$ defines a loss function, such as quantifying a data-misfit, while the nonsmooth part $\mathrm{g}$ can be used to impose structures, such as sparsity, on the decision variable $\mathrm{x}$. Please see [Additional details](#additional-details).
+where $\mathrm{f}\colon \mathbb{R}^n \to \mathbb{R}$ is smooth and convex, and $\mathrm{g}\colon \mathbb{R}^n \to \mathbb{R} \cup \{+\infty\}$, which may be nonsmooth, is proper, closed and convex. The smooth part $\mathrm{f}$ defines a loss function, such as quantifying a data-misfit, while the nonsmooth part $\mathrm{g}$ can be used to impose structures, such as sparsity, on the decision variable $\mathrm{x}$. Please see [Additional details](#additional-details).
 
 
 Most parts of this package is also available in python/JAX at [PySCSOpt](https://github.com/adeyemiadeoye/PySCSOpt).

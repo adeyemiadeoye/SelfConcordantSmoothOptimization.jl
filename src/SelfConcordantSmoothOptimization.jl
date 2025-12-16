@@ -8,7 +8,7 @@ export PHuberSmootherL1L2, PHuberSmootherGL, PHuberSmootherIndBox
 export OsBaSmootherL1L2, OsBaSmootherGL
 export LogExpSmootherIndBox, LogExpSmootherIndBox2, ExponentialSmootherIndBox
 
-using LinearAlgebra, LinearSolve
+using LinearAlgebra
 using ForwardDiff: gradient, hessian, jacobian
 using Dates
 

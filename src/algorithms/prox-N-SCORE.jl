@@ -67,9 +67,8 @@ function step!(method::ProxNSCORE, model::OptimModel, reg_name, hμ, As, x, x_pr
         grad_f = x -> ∇fx
     end
     ∇q = grad_f(x) + λgr
-    lin_prob = LinearProblem(H + λHr, ∇q)
-    sol = solve(lin_prob)
-    d = -sol.u
+    sol = (H + λHr) \ ∇q
+    d = -sol
 
     if method.ss_type == 1 && model.L !==nothing
         step_size = min(1/model.L,1.0)

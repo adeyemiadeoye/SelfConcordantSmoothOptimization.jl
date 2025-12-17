@@ -1,7 +1,7 @@
 name = "SelfConcordantSmoothOptimization"
 uuid = "d352d416-c122-4e2b-b229-b93695c65420"
 authors = ["Adeyemi Damilare Adeoye <58517568+adeyemiadeoye@users.noreply.github.com>"]
-version = "0.1.71"
+version = "0.1.8"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"

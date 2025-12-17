@@ -21,6 +21,7 @@
   - [Citing](#citing)
   - [Acknowledgements](#acknowledgements)
   - [Issues and bug reports](#issues-and-bug-reports)
+  - [Maintainer](#maintainer)
 
 `SelfConcordantSmoothOptimization.jl` is a Julia package that implements the self-concordant regularization (SCORE) technique for solving (nonsmooth) convex optimization with quasi-Newton directions. In particular, `SelfConcordantSmoothOptimization.jl` considers problems of the form
 
@@ -283,7 +284,7 @@ Some details about the implemented algorithms and available options are provided
 ### Some optional arguments
 | Arg      	| Description & usage                                                                                                                                                                                                                                 |
 |----------------	|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------	|
-| `ss_type`   	| <li>Value `1`: If `L` (Lipschitz constant of f) is set in `Problem`, this will set $\mathrm{\alpha}=$ `min{1/L, 1}`. If `L` is not set, $\mathrm{\alpha}$ takes the value set in `iterate!`. Otherwise, it takes a default value $0.5$.</li> <li>Value `2` uses the "inverse" of Barzilai-Borwein method to set $\mathrm{\alpha}$.</li> <li>Value `3` uses a line-search method to choose $\mathrm{\alpha}$.</li> <li>Default value: `1`.</li> <li>Example: `method = ProxLQNSCORE(ss_type=1)`</li> <li>NOTE: $\mathrm{\alpha}$ is not the step size. It uses a value in $(0,1]$ and for scaling the effective step size.</li>                                                                                                                                                                                      		|
+| `ss_type`   	| <li>Value `1`: If `L` (Lipschitz constant of f) is set in `Problem`, this will set $\mathrm{\alpha}=$ `min{1/L, 1}`. If `L` is not set, $\mathrm{\alpha}$ takes the value set in `iterate!`. Otherwise, it takes a default value $0.5$.</li> <li>Value `2` uses the "inverse" of Barzilai-Borwein method to set $\mathrm{\alpha}$.</li> <li>Value `3` uses a line-search method to choose $\mathrm{\alpha}$.</li> <li>Default value: `1`.</li> <li>Example: `method = ProxLQNSCORE(ss_type=1)`</li> <li>NOTE: $\mathrm{\alpha}$ is not the step size. It uses a value in $(0,1]$ to scale the effective step size.</li>                                                                                                                                                                                      		|
 | `use_prox` 	| <li>Value `true` uses the proximal scheme as described in the paper.</li> <li>Value `false` skips the proximal step and takes only the associated quasi-Newton step.</li> <li>Default value: `true`.</li> <li>Example: `method = ProxLQNSCORE(use_prox=true)`</li>                                                                                                                                                                                       		|
 | `m`        	| <li>Memory size for the limited-memory quasi-Newton method `ProxLQNSCORE`.</li> <li>Default value: `10`.</li> <li>Example: `method = ProxLQNSCORE(m=20)`</li>                                                                                                                                                                                                                                                       		|
 
@@ -317,3 +318,6 @@ them.
 
 ## Issues and bug reports
 Please use the [Github issue tracker](https://github.com/adeyemiadeoye/SelfConcordantSmoothOptimization.jl/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) for reporting any issues. All types of issues are welcome including bug reports, feature requests, implementation for a specific research problem, etc.
+
+## Maintainer
+Adeyemi Damilare Adeoye (https://adeyemiadeoye.github.io/)
